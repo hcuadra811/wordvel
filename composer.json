@@ -1,0 +1,26 @@
+{
+    "name": "wordvel/wordvel",
+    "description": "Proof-of-concept Laravel to embedded WordPress runtime bridge.",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Wordvel\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Wordvel\\WordvelServiceProvider"
+            ]
+        }
+    },
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/support": "^13.0",
+        "langsys/openapi-docs-generator": "@dev",
+        "spatie/laravel-data": "^4.0"
+    }
+}
