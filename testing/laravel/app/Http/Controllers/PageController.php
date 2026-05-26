@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Data\PageResource;
 use App\Traits\ApiResponse;
-use App\Support\WordPress\WordPressPageRepository;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class PageController extends Controller
 {
     use ApiResponse;
-
-    public function __construct(
-        private readonly WordPressPageRepository $pages,
-    ) {}
 
     /**
      * @OA\Get(
@@ -37,7 +33,7 @@ final class PageController extends Controller
      */
     public function show(string $slug): JsonResponse
     {
-        $page = $this->pages->findBySlug($slug)
+        $page = PageResource::fromWordPressSlug($slug)
             ?? throw new NotFoundHttpException('Page not found.');
 
         return $this->resourceResponse($page);

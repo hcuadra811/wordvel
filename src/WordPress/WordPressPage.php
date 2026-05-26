@@ -14,14 +14,17 @@ final class WordPressPage
         public readonly string $content,
     ) {}
 
-    public static function fromDatabaseRecord(object $post): self
+    /**
+     * @param array<string, mixed> $post
+     */
+    public static function fromCodex(array $post): self
     {
         return new self(
-            id: (int) $post->ID,
-            slug: (string) $post->post_name,
-            title: (string) $post->post_title,
-            status: (string) $post->post_status,
-            content: (string) $post->post_content,
+            id: (int) $post['id'],
+            slug: (string) $post['slug'],
+            title: (string) $post['title'],
+            status: (string) $post['status'],
+            content: (string) $post['content'],
         );
     }
 }

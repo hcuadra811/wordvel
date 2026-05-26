@@ -22,5 +22,8 @@
         "illuminate/support": "^13.0",
         "langsys/openapi-docs-generator": "@dev",
         "spatie/laravel-data": "^4.0"
+    },
+    "suggest": {
+        "langsys/laravel-api-development-kit": "Adds API response helpers, request DTO processing, exception handling, and API conventions for WordVel apps."
     }
 }

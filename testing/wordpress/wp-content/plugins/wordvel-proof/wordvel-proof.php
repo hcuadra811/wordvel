@@ -10,7 +10,9 @@ declare(strict_types=1);
 use Illuminate\Contracts\Console\Kernel;
 use Wordvel\Runtime\Application as WordvelApplication;
 
-$laravelPath = dirname(__DIR__, 4) . '/laravel';
+$laravelPath = defined('WORDVEL_LARAVEL_PATH')
+    ? WORDVEL_LARAVEL_PATH
+    : dirname(__DIR__, 4) . '/laravel';
 $autoload = $laravelPath . '/vendor/autoload.php';
 $bootstrap = $laravelPath . '/bootstrap/app.php';
 
@@ -73,6 +75,14 @@ add_action('admin_menu', static function (): void {
 });
 
 add_action('init', static function (): void {
+    wp_register_script(
+        'wordvel-editor-blocks',
+        plugins_url('editor-blocks.js', __FILE__),
+        ['wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-data', 'wp-plugins'],
+        (string) filemtime(__DIR__ . '/editor-blocks.js'),
+        true,
+    );
+
     add_filter('block_categories_all', static function (array $categories): array {
         array_unshift($categories, [
             'slug' => 'wordvel',
@@ -83,10 +93,24 @@ add_action('init', static function (): void {
         return $categories;
     });
 
-    foreach (wordvel_block_schemas() as $block) {
-        wordvel_register_editor_block($block);
+    if (! is_admin()) {
+        foreach (wordvel_block_schemas() as $block) {
+            wordvel_register_editor_block($block);
+        }
     }
 });
+
+add_action('admin_enqueue_scripts', static function (): void {
+    global $wp_scripts;
+
+    if (! $wp_scripts instanceof WP_Scripts || ! isset($wp_scripts->registered['wp-edit-post'])) {
+        return;
+    }
+
+    if (! in_array('wordvel-editor-blocks', $wp_scripts->registered['wp-edit-post']->deps, true)) {
+        $wp_scripts->registered['wp-edit-post']->deps[] = 'wordvel-editor-blocks';
+    }
+}, 20);
 
 add_action('enqueue_block_editor_assets', static function (): void {
     foreach (wordvel_editor_style_urls() as $index => $styleUrl) {
@@ -101,14 +125,6 @@ add_action('enqueue_block_editor_assets', static function (): void {
     wp_register_style('wordvel-editor-inline-style', false);
     wp_enqueue_style('wordvel-editor-inline-style');
     wp_add_inline_style('wordvel-editor-inline-style', wordvel_editor_css());
-
-    wp_enqueue_script(
-        'wordvel-editor-blocks',
-        plugins_url('editor-blocks.js', __FILE__),
-        ['wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor'],
-        (string) filemtime(__DIR__ . '/editor-blocks.js'),
-        true,
-    );
 
     wp_add_inline_script(
         'wordvel-editor-blocks',
@@ -166,11 +182,177 @@ function wordvel_editor_css(): string
         }
     }
 
+    try {
+        /** @var \Wordvel\Editor\EditorPreviewRepository $previews */
+        $previews = app(\Wordvel\Editor\EditorPreviewRepository::class);
+        $syncedCss = $previews->css();
+
+        if ($syncedCss !== '') {
+            $css .= "\n" . $syncedCss;
+        }
+    } catch (Throwable) {
+        // Keep the editor usable even if Laravel is unavailable during WordPress boot.
+    }
+
+    if ($css !== '') {
+        $css .= "\n" . str_replace(
+            ['body.theme-night', 'body.theme-dark'],
+            ['.editor-styles-wrapper.wordvel-editor-mode-dark', '.editor-styles-wrapper.wordvel-editor-mode-dark'],
+            $css,
+        );
+
+        return $css . "\n" . wordvel_editor_layout_overrides();
+    }
+
     if ($css === '' && is_file(__DIR__ . '/editor-style.css')) {
-        return (string) file_get_contents(__DIR__ . '/editor-style.css');
+        $css = (string) file_get_contents(__DIR__ . '/editor-style.css');
+        $css .= "\n" . str_replace(
+            ['body.theme-night', 'body.theme-dark'],
+            ['.editor-styles-wrapper.wordvel-editor-mode-dark', '.editor-styles-wrapper.wordvel-editor-mode-dark'],
+            $css,
+        );
+
+        return $css . "\n" . wordvel_editor_layout_overrides();
     }
 
     return $css;
+}
+
+function wordvel_editor_layout_overrides(): string
+{
+    return <<<'CSS'
+.block-editor-block-list__layout .wp-block[data-type^="wordvel/"] {
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+.block-editor-block-list__layout .wp-block[data-type^="wordvel/"]:not([data-align]),
+.editor-styles-wrapper .wordvel-block {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+.editor-styles-wrapper .wordvel-block {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.editor-styles-wrapper .wordvel-block h1,
+.editor-styles-wrapper .wordvel-block h2,
+.editor-styles-wrapper .wordvel-block h3,
+.editor-styles-wrapper .wordvel-block p,
+.editor-styles-wrapper .wordvel-block a,
+.editor-styles-wrapper .wordvel-block span,
+.editor-styles-wrapper .wordvel-block strong {
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+}
+
+.editor-styles-wrapper .wordvel-block .block-editor-rich-text__editable,
+.editor-styles-wrapper .wordvel-block :has(> .block-editor-rich-text__editable) {
+    pointer-events: auto !important;
+}
+
+.editor-styles-wrapper .wordvel-block .block-editor-rich-text__editable {
+    cursor: text;
+    user-select: text;
+}
+
+.editor-styles-wrapper .wordvel-block :is(a, span, figure):has(> img[src=""]) {
+    display: none !important;
+}
+
+.editor-styles-wrapper .wordvel-block button[aria-label$="﻿"],
+.editor-styles-wrapper .wordvel-block button[aria-label$=" "] {
+    display: none !important;
+}
+
+.wordvel-repeater-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 8px;
+}
+
+.wordvel-repeater-heading strong {
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.wordvel-repeater-add-button.components-button {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    margin-left: auto;
+    padding: 0;
+    border-radius: 2px;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.wordvel-media-control {
+    display: grid;
+    gap: 8px;
+}
+
+.wordvel-media-label {
+    margin: 0;
+    color: #1e1e1e;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.wordvel-media-preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 0;
+}
+
+.wordvel-media-button.components-button {
+    width: fit-content;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.media-modal,
+.media-modal * {
+    letter-spacing: 0 !important;
+}
+
+.media-modal h1,
+.media-modal h2,
+.media-modal h3,
+.media-modal p,
+.media-modal button,
+.media-modal input,
+.media-modal select,
+.media-modal textarea {
+    color: revert;
+    font: revert;
+    line-height: revert;
+    text-transform: none;
+}
+
+.media-modal h1,
+.media-modal h2 {
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    line-height: 1.25 !important;
+}
+
+.media-modal img {
+    display: revert;
+    max-width: revert;
+}
+
+CSS;
 }
 
 function wordvel_editor_preview_templates(): array
@@ -289,6 +471,10 @@ function wordvel_site_payload(): array
             'footer' => wordvel_menu_payload('footer'),
         ],
         'regions' => wordvel_regions_payload(),
+        'theme_options' => [
+            'schema' => wordvel_theme_options_schema(),
+            'values' => wordvel_theme_options_values(),
+        ],
     ];
 }
 
@@ -375,6 +561,7 @@ function wordvel_docs_payload(): array
             'manifest_routes' => is_array($manifest) ? ($manifest['routes'] ?? []) : [],
             'region_schema' => is_array($manifest) ? ($manifest['regions'] ?? []) : [],
             'block_schema' => is_array($manifest) ? ($manifest['blocks'] ?? []) : [],
+            'theme_options_schema' => is_array($manifest) ? ($manifest['theme_options'] ?? null) : null,
         ],
     ];
 }
@@ -804,7 +991,7 @@ function wordvel_media_payload(mixed $value): ?array
 
 function wordvel_manifest(): ?array
 {
-    $manifestPath = dirname(__DIR__, 4) . '/laravel/storage/wordvel/manifest.json';
+    $manifestPath = wordvel_laravel_path() . '/storage/wordvel/manifest.json';
 
     if (! file_exists($manifestPath)) {
         return null;
@@ -911,6 +1098,7 @@ function wordvel_register_editor_block(array $block): void
         'title' => (string) ($block['name'] ?? ucfirst($key)),
         'category' => 'wordvel',
         'attributes' => $attributes,
+        'editor_script' => 'wordvel-editor-blocks',
         'render_callback' => static fn (): string => '',
     ]);
 }
@@ -1170,4 +1358,11 @@ function wordvel_sanitize_field_value(string $value, string $type): string
         'select' => sanitize_key($value),
         default => sanitize_text_field($value),
     };
+}
+
+function wordvel_laravel_path(): string
+{
+    return defined('WORDVEL_LARAVEL_PATH')
+        ? WORDVEL_LARAVEL_PATH
+        : dirname(__DIR__, 4) . '/laravel';
 }

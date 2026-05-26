@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Support\WordPress\WordPressSiteRepository;
+use App\Support\WordvelSiteContent;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -13,7 +13,7 @@ final class SiteController extends Controller
     use ApiResponse;
 
     public function __construct(
-        private readonly WordPressSiteRepository $site,
+        private readonly WordvelSiteContent $site,
     ) {}
 
     /**

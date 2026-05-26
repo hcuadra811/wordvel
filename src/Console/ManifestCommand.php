@@ -303,6 +303,10 @@ final class ManifestCommand extends Command
         $itemClass = $field->type === 'repeater' ? $this->repeaterItemClass($parameter, $declaringClass) : null;
         $itemFields = $itemClass === null ? [] : $this->dataFields($itemClass);
 
+        if ($field->type === 'localized_text') {
+            $itemFields = $this->localizedTextFields($field);
+        }
+
         return new FieldSchemaData(
             key: $parameter->getName(),
             type: $field->type,
@@ -354,6 +358,29 @@ final class ManifestCommand extends Command
         $collection = $attribute->newInstance();
 
         return $collection->class;
+    }
+
+    /**
+     * @return FieldSchemaData[]
+     */
+    private function localizedTextFields(Field $field): array
+    {
+        $control = (string) ($field->options['control'] ?? 'textarea');
+
+        return [
+            new FieldSchemaData(
+                key: 'en',
+                type: $control === 'text' ? 'text' : 'textarea',
+                label: $field->label,
+                required: $field->required,
+            ),
+            new FieldSchemaData(
+                key: 'es',
+                type: $control === 'text' ? 'text' : 'textarea',
+                label: $field->label,
+                required: $field->required,
+            ),
+        ];
     }
 
     private function endpoint(string $controller, string $method): ?array

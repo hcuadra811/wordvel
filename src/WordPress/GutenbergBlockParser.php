@@ -2,12 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Support\WordPress;
+namespace Wordvel\WordPress;
 
-use App\Data\MediaResource;
-use App\Data\PageBlockResource;
 use Spatie\LaravelData\Data;
-use Wordvel\WordPress\WordPress;
 
 final class GutenbergBlockParser
 {
@@ -16,7 +13,8 @@ final class GutenbergBlockParser
     ) {}
 
     /**
-     * @return PageBlockResource[]
+     * @param array<string, array<string, mixed>> $blockSchemas
+     * @return array<int, array<string, mixed>>
      */
     public function parse(string $content, array $blockSchemas): array
     {
@@ -37,14 +35,15 @@ final class GutenbergBlockParser
         if ($matches === []) {
             $html = trim($content);
 
-            return $html === '' ? [] : [
-                new PageBlockResource('html-0', 'html', 'Html', ['html' => $html]),
-            ];
+            return $html === '' ? [] : [[
+                'id' => 'html-0',
+                'type' => 'html',
+                'component' => 'Html',
+                'data' => ['html' => $html],
+            ]];
         }
 
-        $blocks = [];
-
-        foreach ($matches as $index => $match) {
+        return array_map(function (array $match, int $index) use ($blockSchemas): array {
             $name = $match['name'];
             $attrs = $match['attrs'] !== '' ? json_decode($match['attrs'], true) : [];
             $attrs = is_array($attrs) ? $attrs : [];
@@ -52,31 +51,26 @@ final class GutenbergBlockParser
             if (str_starts_with($name, 'wordvel/')) {
                 $key = substr($name, strlen('wordvel/'));
                 $schema = $blockSchemas[$key] ?? null;
-                $data = $this->data($schema, $attrs);
 
-                $blocks[] = new PageBlockResource(
-                    id: $key,
-                    type: $key,
-                    component: $schema['component'] ?? $key,
-                    data: $data,
-                );
-
-                continue;
+                return [
+                    'id' => $key,
+                    'type' => $key,
+                    'component' => (string) ($schema['component'] ?? $key),
+                    'data' => $this->data($schema, $attrs),
+                ];
             }
 
-            $blocks[] = new PageBlockResource(
-                id: str_replace('/', '-', $name) . '-' . $index,
-                type: 'wordpress_block',
-                component: 'WordPressBlock',
-                data: [
+            return [
+                'id' => str_replace('/', '-', $name) . '-' . $index,
+                'type' => 'wordpress_block',
+                'component' => 'WordPressBlock',
+                'data' => [
                     'name' => $name,
                     'attrs' => $attrs,
                     'html' => trim($match['html']),
                 ],
-            );
-        }
-
-        return $blocks;
+            ];
+        }, $matches, array_keys($matches));
     }
 
     /**
@@ -115,15 +109,37 @@ final class GutenbergBlockParser
         return $blocks;
     }
 
+    /**
+     * @param array<string, mixed>|null $schema
+     * @param array<string, mixed> $attrs
+     * @return array<string, mixed>
+     */
     private function data(?array $schema, array $attrs): array
     {
         if ($schema === null) {
             return $attrs;
         }
 
+        $data = $this->fields($schema['fields'] ?? [], $attrs);
+        $class = $schema['data_class'] ?? null;
+
+        if (is_string($class) && is_subclass_of($class, Data::class)) {
+            return $class::from($data)->toArray();
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $fields
+     * @param array<string, mixed> $attrs
+     * @return array<string, mixed>
+     */
+    private function fields(array $fields, array $attrs): array
+    {
         $data = [];
 
-        foreach (($schema['fields'] ?? []) as $field) {
+        foreach ($fields as $field) {
             if (! is_array($field)) {
                 continue;
             }
@@ -137,28 +153,35 @@ final class GutenbergBlockParser
             $data[$key] = $this->fieldValue($field, $attrs[$key] ?? ($field['default'] ?? null));
         }
 
-        $class = $schema['data_class'] ?? null;
-
-        if (is_string($class) && is_subclass_of($class, Data::class)) {
-            return $class::from($data)->toArray();
-        }
-
         return $data;
     }
 
+    /**
+     * @param array<string, mixed> $field
+     */
     private function fieldValue(array $field, mixed $value): mixed
     {
         return match ((string) ($field['type'] ?? 'text')) {
             'image', 'media' => $this->media($value),
-            'repeater' => is_array($value) ? array_values($value) : [],
+            'repeater' => array_map(
+                fn (mixed $row): mixed => is_array($row) ? $this->fields($field['fields'] ?? [], $row) : $row,
+                is_array($value) ? array_values($value) : [],
+            ),
             'number' => is_numeric($value) ? $value + 0 : null,
             'boolean' => $value === true || $value === '1' || $value === 1,
             default => $value,
         };
     }
 
-    private function media(mixed $value): ?MediaResource
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function media(mixed $value): ?array
     {
+        if (is_array($value)) {
+            return $value;
+        }
+
         if (! is_numeric($value) || (int) $value <= 0) {
             return null;
         }
@@ -169,14 +192,14 @@ final class GutenbergBlockParser
             return null;
         }
 
-        return new MediaResource(
-            id: $media->id,
-            url: $media->url,
-            mime_type: $media->mimeType,
-            title: $media->title,
-            alt: $media->alt,
-            width: $media->width,
-            height: $media->height,
-        );
+        return [
+            'id' => $media->id,
+            'url' => $media->url,
+            'mime_type' => $media->mimeType,
+            'title' => $media->title,
+            'alt' => $media->alt,
+            'width' => $media->width,
+            'height' => $media->height,
+        ];
     }
 }

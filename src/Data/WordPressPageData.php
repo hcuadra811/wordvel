@@ -8,6 +8,7 @@ use Langsys\OpenApiDocsGenerator\Generators\Attributes\Description;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\OneOfItemsFrom;
 use Spatie\LaravelData\Data;
+use Wordvel\WordPress\WordPressPageRepository;
 
 abstract class WordPressPageData extends Data
 {
@@ -24,4 +25,15 @@ abstract class WordPressPageData extends Data
         #[Description('Ordered content blocks parsed from WordPress post_content.')]
         public array $blocks,
     ) {}
+
+    /**
+     * @param array<string, mixed> $additionalData
+     */
+    public static function fromWordPressSlug(string $slug, array $additionalData = []): ?static
+    {
+        /** @var static|null $page */
+        $page = app(WordPressPageRepository::class)->findBySlug($slug, static::class, $additionalData);
+
+        return $page;
+    }
 }

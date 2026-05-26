@@ -23,8 +23,8 @@ formalized.
 - A `/api/v1/site` endpoint for site chrome, theme options, and WordPress menus.
 - Theme option fields generated from DTO attributes.
 - OpenAPI docs generated from Laravel Data DTOs and route annotations.
-- React-generated Gutenberg previews synced through the WordVel editor preview
-  endpoint.
+- Framework-rendered Gutenberg previews synced through the WordVel editor
+  preview endpoint, with the proof site currently using `@wordvel/react`.
 
 ## Repository Layout
 
@@ -88,6 +88,32 @@ php artisan wordvel:manifest
 php artisan openapi:generate
 ```
 
+## Installing Into A Laravel API
+
+In a Laravel API app, require WordVel and run the installer:
+
+```bash
+composer require wordvel/wordvel
+php artisan wordvel:install
+```
+
+For the fuller API starter shape, install the optional API kit first and let the
+installer publish its conventions too:
+
+```bash
+composer require wordvel/wordvel langsys/laravel-api-development-kit
+php artisan wordvel:install --with-api-kit
+```
+
+The installer publishes `config/wordvel.php`, enables `routes/api.php` in modern
+Laravel apps when needed, scaffolds a DTO-backed `GET /api/v1/health` endpoint,
+installs a local WordPress backend in `wordpress/`, adds a ReDocly API reference
+at `/api/documentation`, generates `storage/wordvel/manifest.json`, and runs
+`openapi:generate` when `langsys/openapi-docs-generator` is installed.
+WordPress installs use the latest WordVel-supported version by default,
+currently WordPress 7.0. Use `--skip-redocly` or `--skip-wordpress` when a
+project needs to opt out of either scaffold.
+
 Useful local endpoints:
 
 ```txt
@@ -104,4 +130,4 @@ The next slices are:
 - Move more WordPress bridge behavior from proof code into package APIs.
 - Keep editor forms generated from DTO contracts.
 - Add a proper install command for the embedded WordPress setup.
-- Continue improving React preview sync and inline Gutenberg editing.
+- Continue improving adapter preview sync and inline Gutenberg editing.

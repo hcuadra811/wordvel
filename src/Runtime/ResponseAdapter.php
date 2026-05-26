@@ -8,6 +8,10 @@ final class ResponseAdapter
 {
     public function success(mixed $result): object
     {
+        if ($this->isJsonResponse($result)) {
+            return $this->wpResponse($this->jsonResponsePayload($result), $result->getStatusCode());
+        }
+
         return $this->wpResponse([
             'status' => true,
             'data' => $this->serialize($result),
@@ -36,6 +40,10 @@ final class ResponseAdapter
 
     private function serialize(mixed $value): mixed
     {
+        if ($this->isJsonResponse($value)) {
+            return $this->jsonResponsePayload($value);
+        }
+
         if (is_object($value) && method_exists($value, 'toArray')) {
             return $value->toArray();
         }
@@ -45,5 +53,24 @@ final class ResponseAdapter
         }
 
         return $value;
+    }
+
+    private function isJsonResponse(mixed $value): bool
+    {
+        return is_object($value)
+            && method_exists($value, 'getContent')
+            && method_exists($value, 'getStatusCode')
+            && property_exists($value, 'headers')
+            && str_contains((string) $value->headers->get('Content-Type'), 'application/json');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonResponsePayload(object $response): array
+    {
+        $payload = json_decode((string) $response->getContent(), true);
+
+        return is_array($payload) ? $payload : [];
     }
 }
