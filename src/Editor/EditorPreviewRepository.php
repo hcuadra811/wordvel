@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Wordvel\Editor;
 
 use Illuminate\Support\Facades\File;
-use Wordvel\Data\EditorPreviewRequestData;
+use Wordvel\Http\Requests\EditorPreviewRequest;
 
 final class EditorPreviewRepository
 {
-    public function store(EditorPreviewRequestData $data): void
+    public function store(EditorPreviewRequest $data): void
     {
         File::ensureDirectoryExists($this->directory());
 

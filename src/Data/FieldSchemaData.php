@@ -6,7 +6,7 @@ namespace Wordvel\Data;
 
 use Spatie\LaravelData\Data;
 
-final class FieldSchemaData extends Data
+class FieldSchemaData extends Data
 {
     /**
      * @param array<string, mixed> $options

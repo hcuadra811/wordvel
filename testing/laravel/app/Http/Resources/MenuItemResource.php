@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Data;
+namespace App\Http\Resources;
+
+use Langsys\ApiKit\Data\BaseData;
 
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 
 /** @typescript */
-final class MenuItemResource extends BaseData
+class MenuItemResource extends BaseData
 {
     public function __construct(
         #[Example(42)]

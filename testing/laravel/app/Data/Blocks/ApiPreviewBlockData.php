@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Data\Blocks;
 
-use App\Data\BaseData;
+use Langsys\ApiKit\Data\BaseData;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\ItemType;
 use Wordvel\Blocks\Attributes\AsBlock;
@@ -14,7 +14,7 @@ use Wordvel\Blocks\Attributes\Textarea;
 /** @typescript */
 #[AsBlock(key: 'api-preview', name: 'API Preview', component: 'ApiPreview')]
 #[ItemType('gutenberg_block', handle: 'api-preview')]
-final class ApiPreviewBlockData extends BaseData
+class ApiPreviewBlockData extends BaseData
 {
     public function __construct(
         #[Text('Label')]

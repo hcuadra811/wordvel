@@ -21,6 +21,11 @@ try {
         'data' => match ($action) {
             'pageBySlug' => wordvel_codex_page_by_slug((string) ($payload['slug'] ?? '')),
             'media' => wordvel_codex_media((int) ($payload['id'] ?? 0)),
+            'importMedia' => wordvel_codex_import_media(
+                (string) ($payload['path'] ?? ''),
+                isset($payload['title']) ? (string) $payload['title'] : null,
+                isset($payload['alt']) ? (string) $payload['alt'] : null,
+            ),
             'option' => wordvel_codex_option((string) ($payload['key'] ?? ''), $payload['default'] ?? null),
             'menuByLocation' => wordvel_codex_menu_by_location(
                 (string) ($payload['location'] ?? ''),
@@ -74,6 +79,61 @@ function wordvel_codex_media(int $id): ?array
         'width' => is_array($metadata) ? ($metadata['width'] ?? null) : null,
         'height' => is_array($metadata) ? ($metadata['height'] ?? null) : null,
     ];
+}
+
+function wordvel_codex_import_media(string $path, ?string $title = null, ?string $alt = null): ?array
+{
+    if ($path === '' || ! is_file($path) || ! is_readable($path)) {
+        throw new InvalidArgumentException('Media source file was not found or is not readable.');
+    }
+
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/media.php';
+    require_once ABSPATH . 'wp-admin/includes/image.php';
+
+    $hash = hash_file('sha256', $path);
+    $existing = get_posts([
+        'post_type' => 'attachment',
+        'post_status' => 'inherit',
+        'posts_per_page' => 1,
+        'fields' => 'ids',
+        'meta_query' => [[
+            'key' => '_wordvel_source_hash',
+            'value' => $hash,
+        ]],
+    ]);
+
+    if (is_array($existing) && isset($existing[0])) {
+        return wordvel_codex_media((int) $existing[0]);
+    }
+
+    $temporaryPath = wp_tempnam(basename($path));
+
+    if (! is_string($temporaryPath) || ! copy($path, $temporaryPath)) {
+        throw new RuntimeException('Unable to prepare media source file for WordPress import.');
+    }
+
+    $file = [
+        'name' => basename($path),
+        'type' => mime_content_type($path) ?: 'application/octet-stream',
+        'tmp_name' => $temporaryPath,
+        'error' => 0,
+        'size' => filesize($path) ?: 0,
+    ];
+
+    $attachmentId = media_handle_sideload($file, 0, $title);
+
+    if (is_wp_error($attachmentId)) {
+        throw new RuntimeException($attachmentId->get_error_message());
+    }
+
+    update_post_meta((int) $attachmentId, '_wordvel_source_hash', $hash);
+
+    if ($alt !== null && $alt !== '') {
+        update_post_meta((int) $attachmentId, '_wp_attachment_image_alt', $alt);
+    }
+
+    return wordvel_codex_media((int) $attachmentId);
 }
 
 function wordvel_codex_option(string $key, mixed $default = null): mixed

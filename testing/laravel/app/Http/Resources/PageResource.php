@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Data;
+namespace App\Http\Resources;
 
 use Wordvel\Data\WordPressPageData;
 
 /** @typescript */
-final class PageResource extends WordPressPageData
+class PageResource extends WordPressPageData
 {
 }

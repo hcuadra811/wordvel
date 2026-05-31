@@ -6,7 +6,7 @@ namespace Wordvel\Data;
 
 use Spatie\LaravelData\Data;
 
-final class RegionBlockSchemaData extends Data
+class RegionBlockSchemaData extends Data
 {
     /**
      * @param FieldSchemaData[] $fields

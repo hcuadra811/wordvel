@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Data\Blocks;
 
-use App\Data\BaseData;
-use App\Data\MediaResource;
+use Langsys\ApiKit\Data\BaseData;
+use App\Http\Resources\MediaResource;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Description;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\ItemType;
@@ -18,7 +18,7 @@ use Wordvel\Blocks\Attributes\Url;
 /** @typescript */
 #[AsBlock(key: 'hero', name: 'Hero', component: 'Hero')]
 #[ItemType('gutenberg_block', handle: 'hero')]
-final class HeroBlockData extends BaseData
+class HeroBlockData extends BaseData
 {
     public function __construct(
         #[Text('Eyebrow')]

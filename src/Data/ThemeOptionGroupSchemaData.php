@@ -6,7 +6,7 @@ namespace Wordvel\Data;
 
 use Spatie\LaravelData\Data;
 
-final class ThemeOptionGroupSchemaData extends Data
+class ThemeOptionGroupSchemaData extends Data
 {
     /**
      * @param FieldSchemaData[] $fields

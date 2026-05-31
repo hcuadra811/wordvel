@@ -1,21 +1,21 @@
 <?php
 
-use App\Data\WordvelExampleRequest;
-use App\Data\WordvelExampleResource;
-use App\Data\PageResource;
-use App\Data\SiteResource;
+use App\Http\Requests\WordvelExampleRequest;
+use App\Http\Resources\WordvelExampleResource;
+use App\Http\Resources\PageResource;
+use App\Http\Resources\SiteResource;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\WordvelEditorPreviewController;
 use App\Http\Controllers\WordvelExampleController;
 use Illuminate\Support\Facades\Route;
-use Wordvel\Data\EditorPreviewRequestData;
-use Wordvel\Data\EditorPreviewResource;
+use App\Http\Requests\EditorPreviewRequest;
+use App\Http\Resources\EditorPreviewResource;
 
 Route::prefix('wordvel')->group(function (): void {
     Route::post('/editor-preview', [WordvelEditorPreviewController::class, 'store'])
         ->name('wordvel.editor-preview.store')
-        ->requestDto(EditorPreviewRequestData::class)
+        ->requestDto(EditorPreviewRequest::class)
         ->responseDto(EditorPreviewResource::class)
         ->wpCapability('manage_options');
 

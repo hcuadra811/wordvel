@@ -6,6 +6,7 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
+        "langsys/laravel-api-development-kit": "dev-main",
         "langsys/openapi-docs-generator": "@dev",
         "php": "^8.3",
         "laravel/framework": "^13.7",
@@ -94,6 +95,13 @@
         {
             "type": "path",
             "url": "../../../openapi-docs-generator",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../../laravel-api-development-kit",
             "options": {
                 "symlink": true
             }

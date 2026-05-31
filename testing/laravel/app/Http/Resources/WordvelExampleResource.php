@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Data;
+namespace App\Http\Resources;
 
-final class WordvelExampleResource
+class WordvelExampleResource
 {
     public function __construct(
         public readonly string $message,

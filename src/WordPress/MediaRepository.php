@@ -14,6 +14,22 @@ final class MediaRepository
     {
         $media = $this->wordpress->call('media', ['id' => $id]);
 
+        return $this->mediaFromPayload($media);
+    }
+
+    public function importFile(string $path, ?string $title = null, ?string $alt = null): ?WordPressMedia
+    {
+        $media = $this->wordpress->call('importMedia', [
+            'path' => $path,
+            'title' => $title,
+            'alt' => $alt,
+        ]);
+
+        return $this->mediaFromPayload($media);
+    }
+
+    private function mediaFromPayload(mixed $media): ?WordPressMedia
+    {
         if (! is_array($media)) {
             return null;
         }

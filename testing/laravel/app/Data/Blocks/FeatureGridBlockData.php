@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Data\Blocks;
 
-use App\Data\BaseData;
+use Langsys\ApiKit\Data\BaseData;
 use Illuminate\Support\Collection;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\ItemType;
@@ -16,7 +16,7 @@ use Wordvel\Blocks\Attributes\Text;
 /** @typescript */
 #[AsBlock(key: 'feature-grid', name: 'Feature Grid', component: 'FeatureGrid')]
 #[ItemType('gutenberg_block', handle: 'feature-grid')]
-final class FeatureGridBlockData extends BaseData
+class FeatureGridBlockData extends BaseData
 {
     public function __construct(
         #[Text('Eyebrow')]

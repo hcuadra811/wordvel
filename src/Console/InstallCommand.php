@@ -427,7 +427,7 @@ namespace App\Data;
 
 use Spatie\LaravelData\Data;
 
-final class WordvelHealthResource extends Data
+class WordvelHealthResource extends Data
 {
     public function __construct(
         public string $name,

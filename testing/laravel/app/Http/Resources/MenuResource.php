@@ -2,14 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Data;
+namespace App\Http\Resources;
+
+use Langsys\ApiKit\Data\BaseData;
 
 use Illuminate\Support\Collection;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Description;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 
 /** @typescript */
-final class MenuResource extends BaseData
+class MenuResource extends BaseData
 {
     public function __construct(
         #[Example('header')]

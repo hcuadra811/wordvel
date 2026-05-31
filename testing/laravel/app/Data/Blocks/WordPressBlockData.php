@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Data\Blocks;
 
-use App\Data\BaseData;
+use Langsys\ApiKit\Data\BaseData;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Description;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\ItemType;
 
 /** @typescript */
 #[ItemType('gutenberg_block', handle: 'wordpress_block')]
-final class WordPressBlockData extends BaseData
+class WordPressBlockData extends BaseData
 {
     public function __construct(
         #[Description('Original Gutenberg block name.'), Example('core/paragraph')]

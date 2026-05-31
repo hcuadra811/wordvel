@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Data\Blocks;
 
-use App\Data\BaseData;
+use Langsys\ApiKit\Data\BaseData;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\ItemType;
 use Wordvel\Blocks\Attributes\AsBlock;
@@ -14,7 +14,7 @@ use Wordvel\Blocks\Attributes\Textarea;
 /** @typescript */
 #[AsBlock(key: 'workflow', name: 'Workflow', component: 'Workflow')]
 #[ItemType('gutenberg_block', handle: 'workflow')]
-final class WorkflowBlockData extends BaseData
+class WorkflowBlockData extends BaseData
 {
     public function __construct(
         #[Text('Eyebrow')]

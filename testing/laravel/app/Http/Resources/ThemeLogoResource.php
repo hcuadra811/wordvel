@@ -2,14 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Data;
+namespace App\Http\Resources;
+
+use Langsys\ApiKit\Data\BaseData;
 
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 use Wordvel\Blocks\Attributes\Select;
 use Wordvel\Blocks\Attributes\Text;
 
 /** @typescript */
-final class ThemeLogoResource extends BaseData
+class ThemeLogoResource extends BaseData
 {
     public function __construct(
         #[Select(['text' => 'Text'], 'Logo Type', required: true)]

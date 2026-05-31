@@ -2,13 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Data;
+namespace App\Http\Resources;
+
+use Langsys\ApiKit\Data\BaseData;
 
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Description;
 use Langsys\OpenApiDocsGenerator\Generators\Attributes\Example;
 
 /** @typescript */
-final class PageBlockResource extends BaseData
+class PageBlockResource extends BaseData
 {
     public function __construct(
         #[Example('hero-0')]

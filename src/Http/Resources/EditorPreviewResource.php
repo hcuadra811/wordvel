@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Wordvel\Data;
+namespace Wordvel\Http\Resources;
 
 use Spatie\LaravelData\Data;
 
-final class EditorPreviewResource extends Data
+/**
+ * Response DTO for the WordVel editor preview sync endpoint.
+ */
+class EditorPreviewResource extends Data
 {
     public function __construct(
         public int $blocks,

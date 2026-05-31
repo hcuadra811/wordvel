@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Data\Blocks;
 
-use App\Data\BaseData;
+use Langsys\ApiKit\Data\BaseData;
 use Wordvel\Blocks\Attributes\Icon;
 use Wordvel\Blocks\Attributes\Text;
 use Wordvel\Blocks\Attributes\Textarea;
 
 /** @typescript */
-final class FeatureItemData extends BaseData
+class FeatureItemData extends BaseData
 {
     public function __construct(
         #[Icon('Icon', icons: [

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Data\WordvelExampleRequest;
-use App\Data\WordvelExampleResource;
+use App\Http\Requests\WordvelExampleRequest;
+use App\Http\Resources\WordvelExampleResource;
 use Illuminate\Contracts\Foundation\Application;
 
 final class WordvelExampleController

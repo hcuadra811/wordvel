@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Data\MenuItemResource;
-use App\Data\MenuResource;
-use App\Data\SiteMenusResource;
-use App\Data\SiteResource;
-use App\Data\ThemeLogoResource;
-use App\Data\ThemeOptionsResource;
+use App\Http\Resources\MenuItemResource;
+use App\Http\Resources\MenuResource;
+use App\Http\Resources\SiteMenusResource;
+use App\Http\Resources\SiteResource;
+use App\Http\Resources\ThemeLogoResource;
+use App\Http\Resources\ThemeOptionsResource;
 use Illuminate\Support\Collection;
 use Wordvel\WordPress\WordPress;
 use Wordvel\WordPress\WordPressMenu;

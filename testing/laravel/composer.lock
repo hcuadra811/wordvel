@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "16e1039800e34989170508db5e2ade64",
+    "content-hash": "f6df7c0b8cce18fe873dfaafb97a01ad",
     "packages": [
         {
             "name": "brick/math",
@@ -1179,12 +1179,71 @@
             "time": "2025-08-22T14:27:06+00:00"
         },
         {
+            "name": "langsys/laravel-api-development-kit",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../../../laravel-api-development-kit",
+                "reference": "c73603a7f00287615db387a873c8b357d4d2f3bf"
+            },
+            "require": {
+                "laravel/framework": "^10.0|^11.0|^12.0|^13.0",
+                "php": "^8.1",
+                "spatie/laravel-data": "^3.0|^4.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+                "phpunit/phpunit": "^10.0|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Langsys\\ApiKit\\ApiKitServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Langsys\\ApiKit\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Langsys\\ApiKit\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Langsys",
+                    "email": "dev@langsys.com"
+                }
+            ],
+            "description": "A comprehensive Laravel API development toolkit with DTO processing, structured exception handling, resource filtering/ordering, and API key authentication.",
+            "keywords": [
+                "api",
+                "api-key",
+                "dto",
+                "exception-handling",
+                "filtering",
+                "laravel",
+                "ordering"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "langsys/openapi-docs-generator",
             "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "../../../openapi-docs-generator",
-                "reference": "1c4e3011fa4b265218e25666532e328c249e3ac6"
+                "reference": "ac431181e08f2c017d306263a2ba0510b0916a77"
             },
             "require": {
                 "doctrine/annotations": "^2.0",
@@ -6924,13 +6983,18 @@
             "dist": {
                 "type": "path",
                 "url": "../..",
-                "reference": "1ac0ba505e9d3e38fa7bf5072671747acf701168"
+                "reference": "93fec9fd189beb74432e64bf584bcb6c662d4607"
             },
             "require": {
                 "illuminate/contracts": "^13.0",
+                "illuminate/database": "^13.0",
                 "illuminate/support": "^13.0",
+                "langsys/openapi-docs-generator": "@dev",
                 "php": "^8.3",
                 "spatie/laravel-data": "^4.0"
+            },
+            "suggest": {
+                "langsys/laravel-api-development-kit": "Adds API response helpers, request DTO processing, exception handling, and API conventions for WordVel apps."
             },
             "type": "library",
             "extra": {
@@ -9311,6 +9375,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
+        "langsys/laravel-api-development-kit": 20,
         "langsys/openapi-docs-generator": 20,
         "wordvel/wordvel": 20
     },

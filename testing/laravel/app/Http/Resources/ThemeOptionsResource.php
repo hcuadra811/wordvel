@@ -2,14 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Data;
+namespace App\Http\Resources;
+
+use Langsys\ApiKit\Data\BaseData;
 
 use Wordvel\ThemeOptions\Attributes\AsThemeOptions;
 use Wordvel\ThemeOptions\Attributes\OptionGroup;
 
 /** @typescript */
 #[AsThemeOptions('site', 'Theme Options')]
-final class ThemeOptionsResource extends BaseData
+class ThemeOptionsResource extends BaseData
 {
     public function __construct(
         #[OptionGroup('Logo')]
