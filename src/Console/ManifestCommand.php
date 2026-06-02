@@ -19,6 +19,7 @@ use Wordvel\Data\FieldSchemaData;
 use Wordvel\Data\ThemeOptionGroupSchemaData;
 use Wordvel\Data\ThemeOptionsSchemaData;
 use Wordvel\Regions\RegionSchema;
+use Wordvel\Resources\ResourceRegistry;
 use Wordvel\ThemeOptions\Attributes\AsThemeOptions;
 use Wordvel\ThemeOptions\Attributes\OptionGroup;
 
@@ -37,11 +38,13 @@ final class ManifestCommand extends Command
                 'styles' => config('wordvel.editor.styles', []),
                 'preview_url' => url('/api/wordvel/editor-preview'),
                 'css_url' => url('/api/wordvel/editor.css'),
+                'resource_api_url' => url('/api/wordvel/resources'),
             ],
             'routes' => [],
             'regions' => [],
             'theme_options' => null,
             'blocks' => [],
+            'resources' => [],
         ];
 
         foreach ($router->getRoutes() as $route) {
@@ -78,6 +81,7 @@ final class ManifestCommand extends Command
         $manifest['regions'] = $this->regions();
         $manifest['theme_options'] = $this->themeOptions();
         $manifest['blocks'] = $this->blocks();
+        $manifest['resources'] = $this->resources();
 
         $path = base_path('storage/wordvel/manifest.json');
 
@@ -94,6 +98,24 @@ final class ManifestCommand extends Command
         $this->line('Routes: ' . count($manifest['routes']));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function resources(): array
+    {
+        try {
+            /** @var ResourceRegistry $resources */
+            $resources = app(ResourceRegistry::class);
+
+            return array_map(
+                static fn ($schema): array => $schema->toArray(),
+                $resources->all(),
+            );
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function isWordvelRoute(Route $route): bool

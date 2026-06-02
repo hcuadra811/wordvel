@@ -26,8 +26,11 @@
 /testing/wordpress/wp-content/*
 !/testing/wordpress/wp-content/plugins/
 /testing/wordpress/wp-content/plugins/*
-!/testing/wordpress/wp-content/plugins/wordvel-proof/
-!/testing/wordpress/wp-content/plugins/wordvel-proof/**
+!/testing/wordpress/wp-content/plugins/wordvel/
+!/testing/wordpress/wp-content/plugins/wordvel/**
+!/testing/wordpress/wp-content/mu-plugins/
+/testing/wordpress/wp-content/mu-plugins/*
+!/testing/wordpress/wp-content/mu-plugins/wordvel-loader.php
 !/testing/wordpress/wp-content/themes/
 /testing/wordpress/wp-content/themes/*
 !/testing/wordpress/wp-content/themes/wordvel-headless/

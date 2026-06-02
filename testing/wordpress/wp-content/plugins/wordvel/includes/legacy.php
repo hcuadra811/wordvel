@@ -1,8 +1,6 @@
 <?php
 /**
- * Plugin Name: WordVel Proof
- * Description: Minimal proof that WordPress can dispatch a REST request into app code through WordVel.
- * Version: 0.0.1
+ * Legacy WordVel editor bridge helpers.
  */
 
 declare(strict_types=1);
@@ -12,7 +10,7 @@ use Wordvel\Runtime\Application as WordvelApplication;
 
 $laravelPath = defined('WORDVEL_LARAVEL_PATH')
     ? WORDVEL_LARAVEL_PATH
-    : dirname(__DIR__, 4) . '/laravel';
+    : dirname(__DIR__, 5) . '/laravel';
 $autoload = $laravelPath . '/vendor/autoload.php';
 $bootstrap = $laravelPath . '/bootstrap/app.php';
 
@@ -27,8 +25,8 @@ $laravel->make(Kernel::class)->bootstrap();
 
 add_action('admin_menu', static function (): void {
     add_menu_page(
-        'Regions',
-        'Regions',
+        'WordVel',
+        'WordVel',
         'manage_options',
         'wordvel-regions',
         'wordvel_regions_index_page',
@@ -77,9 +75,9 @@ add_action('admin_menu', static function (): void {
 add_action('init', static function (): void {
     wp_register_script(
         'wordvel-editor-blocks',
-        plugins_url('editor-blocks.js', __FILE__),
+        plugins_url('../assets/editor-blocks.js', __FILE__),
         ['wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-data', 'wp-plugins'],
-        (string) filemtime(__DIR__ . '/editor-blocks.js'),
+        (string) filemtime(dirname(__DIR__) . '/assets/editor-blocks.js'),
         true,
     );
 
@@ -113,23 +111,12 @@ add_action('admin_enqueue_scripts', static function (): void {
 }, 20);
 
 add_action('enqueue_block_editor_assets', static function (): void {
-    foreach (wordvel_editor_style_urls() as $index => $styleUrl) {
-        wp_enqueue_style(
-            'wordvel-editor-style-' . $index,
-            $styleUrl,
-            [],
-            null,
-        );
-    }
-
-    wp_register_style('wordvel-editor-inline-style', false);
-    wp_enqueue_style('wordvel-editor-inline-style');
-    wp_add_inline_style('wordvel-editor-inline-style', wordvel_editor_css());
-
     wp_add_inline_script(
         'wordvel-editor-blocks',
         'window.wordvelBlocks = ' . wp_json_encode(wordvel_block_schemas()) . ';' . "\n" .
-        'window.wordvelEditorPreviews = ' . wp_json_encode(wordvel_editor_preview_templates()) . ';',
+        'window.wordvelEditorPreviews = ' . wp_json_encode(wordvel_editor_preview_templates()) . ';' . "\n" .
+        'window.wordvelResourceApiUrl = ' . wp_json_encode(untrailingslashit((string) (wordvel_manifest()['editor']['resource_api_url'] ?? ''))) . ';' . "\n" .
+        'window.wordvelResourceSchemas = ' . wp_json_encode(wordvel_resource_schemas()) . ';',
         'before',
     );
 });
@@ -204,8 +191,8 @@ function wordvel_editor_css(): string
         return $css . "\n" . wordvel_editor_layout_overrides();
     }
 
-    if ($css === '' && is_file(__DIR__ . '/editor-style.css')) {
-        $css = (string) file_get_contents(__DIR__ . '/editor-style.css');
+    if ($css === '' && is_file(dirname(__DIR__) . '/assets/editor-style.css')) {
+        $css = (string) file_get_contents(dirname(__DIR__) . '/assets/editor-style.css');
         $css .= "\n" . str_replace(
             ['body.theme-night', 'body.theme-dark'],
             ['.editor-styles-wrapper.wordvel-editor-mode-dark', '.editor-styles-wrapper.wordvel-editor-mode-dark'],
@@ -319,6 +306,92 @@ function wordvel_editor_layout_overrides(): string
     padding: 0 10px;
     font-size: 13px;
     line-height: 1;
+}
+
+.wordvel-relationship-control,
+.wordvel-relationship-selected,
+.wordvel-relationship-modal-fields {
+    display: grid;
+    gap: 8px;
+}
+
+.wordvel-relationship-label {
+    display: block;
+    color: #1e1e1e;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.wordvel-relationship-combobox {
+    position: relative;
+}
+
+.wordvel-relationship-combobox input {
+    width: 100%;
+}
+
+.wordvel-relationship-menu {
+    position: absolute;
+    z-index: 40;
+    right: 0;
+    left: 0;
+    max-height: 240px;
+    overflow: auto;
+    border: 1px solid #8c8f94;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.wordvel-relationship-menu button:not(.components-button) {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-bottom: 1px solid #f0f0f1;
+    background: #fff;
+    text-align: left;
+}
+
+.wordvel-relationship-menu button:hover,
+.wordvel-relationship-menu button.is-selected {
+    background: #f6f7f7;
+}
+
+.wordvel-relationship-menu p {
+    margin: 0;
+    padding: 10px;
+    color: #646970;
+}
+
+.wordvel-relationship-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+}
+
+.wordvel-relationship-row > span {
+    flex: 1;
+    min-width: 0;
+}
+
+.wordvel-relationship-row.is-sortable {
+    cursor: grab;
+}
+
+.wordvel-relationship-drag {
+    flex: 0 0 auto !important;
+    color: #646970;
+    cursor: grab;
+}
+
+.wordvel-relationship-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
 }
 
 .media-modal,
@@ -1086,10 +1159,13 @@ function wordvel_register_editor_block(array $block): void
         }
 
         $isRepeater = ($field['type'] ?? null) === 'repeater';
+        $isRelationshipList = ($field['type'] ?? null) === 'relationship'
+            && (bool) ($field['options']['multiple'] ?? false);
+        $isObject = in_array(($field['type'] ?? null), ['image', 'media', 'localized_text'], true);
 
         $attributes[$fieldKey] = [
-            'type' => $isRepeater ? 'array' : 'string',
-            'default' => $isRepeater ? ($field['default'] ?? []) : (isset($field['default']) ? (string) $field['default'] : ''),
+            'type' => ($isRepeater || $isRelationshipList) ? 'array' : ($isObject ? 'object' : 'string'),
+            'default' => ($isRepeater || $isRelationshipList) ? ($field['default'] ?? []) : ($isObject ? ($field['default'] ?? []) : (isset($field['default']) ? (string) $field['default'] : '')),
         ];
     }
 
@@ -1364,5 +1440,5 @@ function wordvel_laravel_path(): string
 {
     return defined('WORDVEL_LARAVEL_PATH')
         ? WORDVEL_LARAVEL_PATH
-        : dirname(__DIR__, 4) . '/laravel';
+        : dirname(__DIR__, 5) . '/laravel';
 }

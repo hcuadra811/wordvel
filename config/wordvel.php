@@ -11,4 +11,11 @@ return [
             env('WORDVEL_EDITOR_STYLE_URL'),
         ])),
     ],
+    'resources' => [
+        'paths' => [
+            app_path('Data/Resources'),
+        ],
+        'classes' => [],
+        'middleware' => ['api'],
+    ],
 ];

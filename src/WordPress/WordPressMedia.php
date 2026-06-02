@@ -14,5 +14,6 @@ final class WordPressMedia
         public readonly ?string $alt,
         public readonly ?int $width,
         public readonly ?int $height,
+        public readonly ?int $durationSeconds = null,
     ) {}
 }

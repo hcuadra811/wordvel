@@ -78,6 +78,7 @@ function wordvel_codex_media(int $id): ?array
         'alt' => get_post_meta($id, '_wp_attachment_image_alt', true) ?: null,
         'width' => is_array($metadata) ? ($metadata['width'] ?? null) : null,
         'height' => is_array($metadata) ? ($metadata['height'] ?? null) : null,
+        'duration_seconds' => is_array($metadata) && isset($metadata['length']) ? (int) $metadata['length'] : null,
     ];
 }
 

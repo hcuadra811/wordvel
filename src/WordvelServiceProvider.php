@@ -10,8 +10,13 @@ use Wordvel\Console\InstallCommand;
 use Wordvel\Console\ManifestCommand;
 use Wordvel\Console\ProofCommand;
 use Wordvel\Runtime\Application;
+use Wordvel\Resources\ResourceDiscovery;
+use Wordvel\Resources\ResourceRegistry;
+use Wordvel\Resources\ResourceRepository;
+use Wordvel\Resources\ResourceSchemaFactory;
 use Wordvel\WordPress\GutenbergBlockParser;
 use Wordvel\WordPress\ManifestBlockRepository;
+use Wordvel\WordPress\MediaRepository;
 use Wordvel\WordPress\WordPress;
 use Wordvel\WordPress\WordPressPageRepository;
 
@@ -29,6 +34,11 @@ final class WordvelServiceProvider extends ServiceProvider
         $this->app->singleton(ManifestBlockRepository::class);
         $this->app->singleton(GutenbergBlockParser::class);
         $this->app->singleton(WordPressPageRepository::class);
+        $this->app->singleton(ResourceDiscovery::class);
+        $this->app->singleton(ResourceSchemaFactory::class);
+        $this->app->singleton(ResourceRegistry::class);
+        $this->app->singleton(ResourceRepository::class);
+        $this->app->singleton(MediaRepository::class);
     }
 
     public function boot(): void
@@ -54,6 +64,8 @@ final class WordvelServiceProvider extends ServiceProvider
 
             return $this;
         });
+
+        $this->loadRoutesFrom(__DIR__ . '/../routes/wordvel.php');
 
         if ($this->app->runningInConsole()) {
             $this->commands([

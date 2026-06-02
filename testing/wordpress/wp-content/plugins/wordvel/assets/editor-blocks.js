@@ -21,6 +21,7 @@
     var ToggleControl = wp.components.ToggleControl;
     var ColorPalette = wp.components.ColorPalette;
     var Button = wp.components.Button;
+    var Modal = wp.components.Modal;
     var TextControl = wp.components.TextControl;
     var TextareaControl = wp.components.TextareaControl;
     var InspectorControls = wp.blockEditor.InspectorControls;
@@ -35,13 +36,16 @@
         var attributes = {};
 
         (schema.fields || []).forEach(function (field) {
+            var isRelationshipList = field.type === 'relationship' && field.options && field.options.multiple;
+            var isObjectField = field.type === 'image' || field.type === 'media' || field.type === 'localized_text';
+
             attributes[field.key] = {
-                type: field.type === 'repeater'
+                type: field.type === 'repeater' || isRelationshipList
                     ? 'array'
-                    : field.type === 'image' || field.type === 'media' || field.type === 'localized_text'
+                    : isObjectField
                         ? 'object'
                         : 'string',
-                default: field.type === 'repeater'
+                default: field.type === 'repeater' || isRelationshipList
                     ? (field.default || [])
                     : field.type === 'image' || field.type === 'media'
                         ? (field.default || {})
@@ -1338,6 +1342,15 @@
             );
         }
 
+        if (field.type === 'relationship') {
+            return el(WordvelRelationshipControl, {
+                key: key,
+                field: field,
+                value: value,
+                onChange: setValue
+            });
+        }
+
         if (field.type === 'icon') {
             return el(WordvelIconControl, {
                 key: key,
@@ -1352,6 +1365,403 @@
             type: field.type === 'url' ? 'url' : 'text',
             label: field.label,
             value: value,
+            onChange: setValue
+        });
+    }
+
+    function WordvelRelationshipControl(props) {
+        var field = props.field;
+        var multiple = !!(field.options && field.options.multiple);
+        var sortable = multiple && !!(field.options && field.options.sortable);
+        var resource = field.options && field.options.resource;
+        var searchState = useState('');
+        var openState = useState(false);
+        var optionsState = useState([]);
+        var labelsState = useState({});
+        var loadingState = useState(false);
+        var modalState = useState(null);
+        var dragState = useState(null);
+        var search = searchState[0];
+        var setSearch = searchState[1];
+        var isOpen = openState[0];
+        var setOpen = openState[1];
+        var options = optionsState[0];
+        var setOptions = optionsState[1];
+        var labels = labelsState[0];
+        var setLabels = labelsState[1];
+        var isLoading = loadingState[0];
+        var setLoading = loadingState[1];
+        var modal = modalState[0];
+        var setModal = modalState[1];
+        var draggedIndex = dragState[0];
+        var setDraggedIndex = dragState[1];
+        var selectedIds = multiple
+            ? (Array.isArray(props.value) ? props.value.map(String) : [])
+            : (props.value ? [String(props.value)] : []);
+
+        useEffect(function () {
+            if (!resource || !window.wordvelResourceApiUrl || !isOpen) {
+                return;
+            }
+
+            var alive = true;
+            var url = window.wordvelResourceApiUrl + '/' + encodeURIComponent(resource) + '/options';
+            var query = new URLSearchParams();
+
+            if (search) {
+                query.set('search', search);
+            }
+
+            setLoading(true);
+            window.fetch(url + (query.toString() ? '?' + query.toString() : ''), {
+                headers: { Accept: 'application/json' }
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Could not load ' + resource);
+                }
+
+                return response.json();
+            }).then(function (json) {
+                var items = json && Array.isArray(json.data) ? json.data : json;
+
+                if (alive) {
+                    setOptions(Array.isArray(items) ? items : []);
+                }
+            }).catch(function () {
+                if (alive) {
+                    setOptions([]);
+                }
+            }).finally(function () {
+                if (alive) {
+                    setLoading(false);
+                }
+            });
+
+            return function () {
+                alive = false;
+            };
+        }, [resource, search, isOpen]);
+
+        useEffect(function () {
+            if (!resource || !window.wordvelResourceApiUrl || selectedIds.length === 0) {
+                return;
+            }
+
+            var missingIds = selectedIds.filter(function (id) {
+                return !labels[id];
+            });
+
+            if (missingIds.length === 0) {
+                return;
+            }
+
+            var alive = true;
+            var url = window.wordvelResourceApiUrl + '/' + encodeURIComponent(resource) + '/options';
+            var query = new URLSearchParams();
+            missingIds.forEach(function (id) {
+                query.append('ids[]', id);
+            });
+
+            window.fetch(url + '?' + query.toString(), {
+                headers: { Accept: 'application/json' }
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Could not load selected ' + resource);
+                }
+
+                return response.json();
+            }).then(function (json) {
+                var items = json && Array.isArray(json.data) ? json.data : json;
+                var nextLabels = Object.assign({}, labels);
+
+                (Array.isArray(items) ? items : []).forEach(function (item) {
+                    nextLabels[String(item.id)] = item.label;
+                });
+
+                if (alive) {
+                    setLabels(nextLabels);
+                }
+            }).catch(function () {});
+
+            return function () {
+                alive = false;
+            };
+        }, [resource, selectedIds.join('|')]);
+
+        var selected = selectedIds.map(function (id) {
+            return { id: id, label: labels[id] || '#' + id };
+        });
+
+        var addId = function (id) {
+            if (!id) {
+                return;
+            }
+
+            if (!multiple) {
+                props.onChange(String(id));
+                return;
+            }
+
+            if (selectedIds.indexOf(String(id)) === -1) {
+                props.onChange(selectedIds.concat([String(id)]));
+            }
+        };
+
+        var removeAt = function (index) {
+            props.onChange(selectedIds.filter(function (_, selectedIndex) {
+                return selectedIndex !== index;
+            }));
+        };
+
+        var moveTo = function (fromIndex, toIndex) {
+            if (fromIndex === null || fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+            var next = selectedIds.slice();
+            var item = next.splice(fromIndex, 1)[0];
+            next.splice(toIndex, 0, item);
+            props.onChange(next);
+            setDraggedIndex(null);
+        };
+
+        var openCreateModal = function () {
+            var schema = wordvelResourceSchema(resource);
+
+            if (!schema) return;
+
+            setModal({
+                schema: schema,
+                values: wordvelEmptyValuesForSchema(schema)
+            });
+        };
+
+        var createRelated = function () {
+            if (!modal || !resource || !window.wordvelResourceApiUrl) {
+                return;
+            }
+
+            window.fetch(window.wordvelResourceApiUrl + '/' + encodeURIComponent(resource), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values: modal.values || {} })
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Could not create ' + resource);
+                }
+
+                return response.json();
+            }).then(function (json) {
+                var record = json && json.data ? json.data : json;
+                var id = record && record.id ? String(record.id) : '';
+
+                if (id) {
+                    setOptions([{ id: id, label: record.title || '#' + id }].concat(options));
+                    setLabels(Object.assign({}, labels, { [id]: record.title || '#' + id }));
+                    addId(id);
+                    setModal(null);
+                }
+            });
+        };
+
+        return el('div', { className: 'wordvel-relationship-control' }, [
+            el('label', { key: 'label', className: 'wordvel-relationship-label' }, field.label),
+            el('div', { key: 'combo', className: 'wordvel-relationship-combobox' }, [
+                el('input', {
+                    key: 'input',
+                    type: 'search',
+                    role: 'combobox',
+                    autoComplete: 'off',
+                    value: isOpen || multiple ? search : (selectedIds[0] ? (labels[selectedIds[0]] || '') : ''),
+                    placeholder: multiple ? 'Search and attach' : 'Search or select',
+                    onFocus: function () {
+                        setOpen(true);
+                    },
+                    onChange: function (event) {
+                        setSearch(event.target.value);
+                        setOpen(true);
+                    },
+                    onKeyDown: function (event) {
+                        if (event.key === 'Escape') {
+                            setOpen(false);
+                        }
+                    }
+                }),
+                isOpen ? el('div', { key: 'menu', className: 'wordvel-relationship-menu' }, [
+                    options.length ? el('div', { key: 'options' }, options.map(function (option) {
+                        var id = String(option.id);
+                        var selectedAlready = selectedIds.indexOf(id) !== -1;
+
+                        return el('button', {
+                            key: id,
+                            type: 'button',
+                            className: selectedAlready ? 'is-selected' : '',
+                            onClick: function () {
+                                setLabels(Object.assign({}, labels, { [id]: option.label }));
+                                addId(id);
+                                setSearch('');
+                                setOpen(multiple);
+                            }
+                        }, option.label);
+                    })) : el('p', { key: 'empty' }, isLoading ? 'Loading...' : 'No results'),
+                    el(Button, {
+                        key: 'create',
+                        variant: 'tertiary',
+                        onClick: openCreateModal
+                    }, '+ Create new')
+                ]) : null
+            ]),
+            multiple ? el('div', { key: 'selected', className: 'wordvel-relationship-selected' }, selected.map(function (option, index) {
+                return el('div', {
+                    key: option.id + '-' + index,
+                    className: sortable ? 'wordvel-relationship-row is-sortable' : 'wordvel-relationship-row',
+                    draggable: sortable,
+                    onDragStart: sortable ? function () { setDraggedIndex(index); } : undefined,
+                    onDragOver: sortable ? function (event) { event.preventDefault(); } : undefined,
+                    onDrop: sortable ? function (event) {
+                        event.preventDefault();
+                        moveTo(draggedIndex, index);
+                    } : undefined,
+                    onDragEnd: sortable ? function () { setDraggedIndex(null); } : undefined
+                }, [
+                    sortable ? el('span', { key: 'handle', className: 'wordvel-relationship-drag' }, '⋮⋮') : null,
+                    el('span', { key: 'label' }, option.label),
+                    el(Button, { key: 'remove', className: 'wordvel-icon-button', icon: 'trash', label: 'Remove', isDestructive: true, onClick: function () { removeAt(index); } })
+                ]);
+            })) : null,
+            modal && Modal ? el(Modal, {
+                key: 'modal',
+                title: 'Create ' + (modal.schema.label || resource),
+                onRequestClose: function () { setModal(null); }
+            }, [
+                el('div', { key: 'fields', className: 'wordvel-relationship-modal-fields' },
+                    (modal.schema.fields || []).map(function (modalField) {
+                        return wordvelModalFieldControl(modalField, modal, function (values) {
+                            setModal(Object.assign({}, modal, { values: values }));
+                        });
+                    })
+                ),
+                el('div', { key: 'actions', className: 'wordvel-relationship-modal-actions' }, [
+                    el(Button, { key: 'cancel', variant: 'secondary', onClick: function () { setModal(null); } }, 'Cancel'),
+                    el(Button, { key: 'create', variant: 'primary', onClick: createRelated }, 'Create')
+                ])
+            ]) : null
+        ]);
+    }
+
+    function wordvelResourceSchema(resource) {
+        return (window.wordvelResourceSchemas || []).find(function (candidate) {
+            return candidate && candidate.key === resource;
+        });
+    }
+
+    function wordvelEmptyValuesForSchema(schema) {
+        var fields = schema && Array.isArray(schema.fields) ? schema.fields : [];
+
+        return fields.reduce(function (values, field) {
+            if (field.type === 'media') {
+                values[field.key] = field.options && field.options.multiple ? [] : null;
+            } else if (field.type === 'relationship') {
+                values[field.key] = field.options && field.options.multiple ? [] : '';
+            } else if (field.type === 'boolean') {
+                values[field.key] = false;
+            } else {
+                values[field.key] = field.default == null ? '' : field.default;
+            }
+
+            return values;
+        }, {});
+    }
+
+    function wordvelModalFieldControl(field, modal, setValues) {
+        var values = modal.values || {};
+        var value = values[field.key];
+        var setValue = function (nextValue) {
+            setValues(Object.assign({}, values, { [field.key]: nextValue }));
+        };
+
+        if (field.type === 'textarea' || field.type === 'rich_text') {
+            return el(TextareaControl, {
+                key: field.key,
+                label: field.label,
+                value: value || '',
+                onChange: setValue
+            });
+        }
+
+        if (field.type === 'number') {
+            return el(TextControl, {
+                key: field.key,
+                type: 'number',
+                label: field.label,
+                value: value || '',
+                disabled: field.options && field.options.readonly,
+                onChange: setValue
+            });
+        }
+
+        if (field.type === 'boolean') {
+            return el(ToggleControl, {
+                key: field.key,
+                label: field.label,
+                checked: value === true || value === '1',
+                onChange: setValue
+            });
+        }
+
+        if (field.type === 'select') {
+            return el(SelectControl, {
+                key: field.key,
+                label: field.label,
+                value: value || '',
+                options: wordvelSelectOptions(field),
+                onChange: setValue
+            });
+        }
+
+        if (field.type === 'media') {
+            return el(MediaUploadCheck, { key: field.key },
+                el(MediaUpload, {
+                    onSelect: function (media) {
+                        setValue(wordvelMediaValue(media));
+                    },
+                    allowedTypes: field.options && field.options.media_type ? [field.options.media_type] : undefined,
+                    value: value && value.id ? parseInt(value.id, 10) : undefined,
+                    render: function (uploadProps) {
+                        return el('div', { className: 'wordvel-media-control' }, [
+                            el('p', { key: 'label', className: 'wordvel-media-label' }, field.label),
+                            value && value.url ? el('img', {
+                                key: 'preview',
+                                src: value.url,
+                                alt: value.alt || '',
+                                className: 'wordvel-media-preview'
+                            }) : null,
+                            el(Button, {
+                                key: 'button',
+                                className: 'wordvel-media-button',
+                                variant: 'secondary',
+                                onClick: uploadProps.open
+                            }, value && value.id ? 'Change media' : 'Select media')
+                        ]);
+                    }
+                })
+            );
+        }
+
+        if (field.type === 'relationship') {
+            return el(WordvelRelationshipControl, {
+                key: field.key,
+                field: field,
+                value: value,
+                onChange: setValue
+            });
+        }
+
+        return el(TextControl, {
+            key: field.key,
+            type: field.type === 'url' ? 'url' : 'text',
+            label: field.label,
+            value: value || '',
             onChange: setValue
         });
     }

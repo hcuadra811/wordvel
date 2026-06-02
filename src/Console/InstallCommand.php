@@ -317,10 +317,10 @@ PHP;
         $this->ensureDirectory($files, $contentPath . '/themes');
         $this->ensureDirectory($files, $contentPath . '/mu-plugins');
 
-        $files->copyDirectory($source . '/plugins/wordvel-proof', $contentPath . '/plugins/wordvel-proof');
+        $files->copyDirectory($source . '/plugins/wordvel', $contentPath . '/plugins/wordvel');
         $files->copyDirectory($source . '/themes/wordvel-headless', $contentPath . '/themes/wordvel-headless');
-        $files->copy($source . '/mu-plugins/wordvel-proof-loader.php', $contentPath . '/mu-plugins/wordvel-proof-loader.php');
-        $this->patchBridgePlugin($files, $contentPath . '/plugins/wordvel-proof/wordvel-proof.php');
+        $files->copy($source . '/mu-plugins/wordvel-loader.php', $contentPath . '/mu-plugins/wordvel-loader.php');
+        $this->patchBridgePlugin($files, $contentPath . '/plugins/wordvel/includes/legacy.php');
     }
 
     private function patchBridgePlugin(Filesystem $files, string $pluginPath): void

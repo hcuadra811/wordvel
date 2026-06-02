@@ -42,6 +42,7 @@ final class MediaRepository
             alt: $media['alt'] ?? null,
             width: isset($media['width']) ? (int) $media['width'] : null,
             height: isset($media['height']) ? (int) $media['height'] : null,
+            durationSeconds: isset($media['duration_seconds']) ? (int) $media['duration_seconds'] : null,
         );
     }
 }
