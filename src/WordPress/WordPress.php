@@ -11,6 +11,7 @@ final class WordPress
         private readonly MediaRepository $media,
         private readonly OptionRepository $options,
         private readonly MenuRepository $menus,
+        private readonly SiteRepository $site,
     ) {}
 
     public function pages(): PageRepository
@@ -31,5 +32,10 @@ final class WordPress
     public function menus(): MenuRepository
     {
         return $this->menus;
+    }
+
+    public function site(): SiteRepository
+    {
+        return $this->site;
     }
 }

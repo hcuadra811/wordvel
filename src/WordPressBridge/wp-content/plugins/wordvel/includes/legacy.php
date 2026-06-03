@@ -688,6 +688,57 @@ function wordvel_logo_payload(): ?array
     ];
 }
 
+function wordvel_site_icon_payload(): ?array
+{
+    $iconId = (int) get_option('site_icon');
+
+    if ($iconId <= 0) {
+        return null;
+    }
+
+    $image = wp_get_attachment_image_src($iconId, 'full');
+
+    if ($image === false) {
+        return null;
+    }
+
+    return [
+        'id' => $iconId,
+        'url' => $image[0],
+        'width' => $image[1],
+        'height' => $image[2],
+        'alt' => get_post_meta($iconId, '_wp_attachment_image_alt', true) ?: null,
+    ];
+}
+
+function wordvel_codex_site_identity(): array
+{
+    return [
+        'logo' => wordvel_logo_payload(),
+        'favicon' => wordvel_site_icon_payload(),
+    ];
+}
+
+function wordvel_codex_set_option(string $key, mixed $value): bool
+{
+    if ($key === '') {
+        return false;
+    }
+
+    return update_option($key, $value);
+}
+
+function wordvel_codex_set_theme_mod(string $key, mixed $value): bool
+{
+    if ($key === '') {
+        return false;
+    }
+
+    set_theme_mod($key, $value);
+
+    return true;
+}
+
 function wordvel_menu_payload(string $location): array
 {
     $locations = get_nav_menu_locations();

@@ -31,6 +31,15 @@ try {
                 (string) ($payload['location'] ?? ''),
                 (string) ($payload['theme'] ?? 'wordvel-headless'),
             ),
+            'siteIdentity' => wordvel_codex_site_identity(),
+            'setOption' => wordvel_codex_set_option(
+                (string) ($payload['key'] ?? ''),
+                $payload['value'] ?? null,
+            ),
+            'setThemeMod' => wordvel_codex_set_theme_mod(
+                (string) ($payload['key'] ?? ''),
+                $payload['value'] ?? null,
+            ),
             default => throw new InvalidArgumentException("Unknown WordPress Codex action [{$action}]."),
         },
     ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

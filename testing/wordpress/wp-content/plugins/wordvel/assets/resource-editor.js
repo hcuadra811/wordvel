@@ -19,14 +19,149 @@
         return !!(field && field.type === 'number' && field.options && field.options.format === 'timecode');
     }
 
+    function padMillisecondsSegment(segment) {
+        var digits = String(segment || '').replace(/\D/g, '');
+
+        if (!digits) {
+            return 0;
+        }
+
+        if (digits.length > 3) {
+            digits = digits.slice(0, 3);
+        }
+
+        return Math.min(999, parseInt(digits.padEnd(3, '0'), 10) || 0);
+    }
+
+    function looksLikeSecondsMillisecondsPair(seconds, milliseconds) {
+        if (!/^\d+$/.test(milliseconds)) {
+            return false;
+        }
+
+        if (milliseconds.length === 3) {
+            return true;
+        }
+
+        return seconds >= 10 && milliseconds.length >= 1 && milliseconds.length <= 2;
+    }
+
+    function parseTimecodeInput(raw) {
+        var value = String(raw == null ? '' : raw).trim().replace(',', '.');
+
+        if (!value) {
+            return null;
+        }
+
+        if (/^\d+(\.\d+)?$/.test(value)) {
+            return parseFloat(value);
+        }
+
+        var legacyMatch = value.match(/^(\d+):(\d{1,2})\.(\d{1,3})$/);
+
+        if (legacyMatch) {
+            return (parseInt(legacyMatch[1], 10) * 60)
+                + parseInt(legacyMatch[2], 10)
+                + (padMillisecondsSegment(legacyMatch[3]) / 1000);
+        }
+
+        var parts = value.split(':').map(function (part) {
+            return part.trim();
+        }).filter(function (part) {
+            return part !== '';
+        });
+
+        if (parts.length === 1) {
+            return /^\d+(\.\d+)?$/.test(parts[0]) ? parseFloat(parts[0]) : null;
+        }
+
+        if (parts.length === 2) {
+            if (!/^\d+$/.test(parts[0]) || !/^(\d+)(\.\d+)?$/.test(parts[1])) {
+                return null;
+            }
+
+            var first = parseInt(parts[0], 10);
+
+            if (looksLikeSecondsMillisecondsPair(first, parts[1])) {
+                return first + (padMillisecondsSegment(parts[1]) / 1000);
+            }
+
+            return (first * 60) + parseFloat(parts[1]);
+        }
+
+        if (parts.length === 3) {
+            if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1]) || !/^\d+$/.test(parts[2])) {
+                return null;
+            }
+
+            var secondsPart = parseInt(parts[1], 10);
+
+            if (secondsPart < 0 || secondsPart > 59) {
+                return null;
+            }
+
+            return (parseInt(parts[0], 10) * 60)
+                + secondsPart
+                + (padMillisecondsSegment(parts[2]) / 1000);
+        }
+
+        return null;
+    }
+
+    function formatTimecodeInput(seconds) {
+        var totalMs = Math.max(0, Math.round(Number(seconds) * 1000));
+        var milliseconds = totalMs % 1000;
+        var totalSeconds = Math.floor(totalMs / 1000);
+        var secondsPart = totalSeconds % 60;
+        var minutes = Math.floor(totalSeconds / 60);
+
+        return minutes + ':' + String(secondsPart).padStart(2, '0') + ':' + String(milliseconds).padStart(3, '0');
+    }
+
+    function displayTimecodeValue(value) {
+        if (value == null || value === '') {
+            return '';
+        }
+
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return formatTimecodeInput(value);
+        }
+
+        var asString = String(value).trim();
+
+        if (/^\d+(\.\d+)?$/.test(asString)) {
+            return formatTimecodeInput(parseFloat(asString));
+        }
+
+        return asString;
+    }
+
     function renderTimecodeInput(field, value, onChange, extras) {
         return element('input', Object.assign({
             type: 'text',
-            value: value == null ? '' : String(value),
+            value: displayTimecodeValue(value),
             placeholder: '0:00:000',
-            title: 'Minutes:seconds:milliseconds (e.g. 0:23:700)',
+            title: 'Time: 23, 1:23, 23:700, or 0:23:700',
             oninput: function (event) {
                 onChange(event.target.value);
+            },
+            onblur: function (event) {
+                var raw = event.target.value.trim();
+
+                if (!raw) {
+                    onChange('');
+                    return;
+                }
+
+                var seconds = parseTimecodeInput(raw);
+
+                if (seconds == null) {
+                    return;
+                }
+
+                var formatted = formatTimecodeInput(seconds);
+
+                event.target.value = formatted;
+                onChange(formatted);
             }
         }, extras || {}));
     }

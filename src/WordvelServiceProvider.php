@@ -17,6 +17,7 @@ use Wordvel\Resources\ResourceSchemaFactory;
 use Wordvel\WordPress\GutenbergBlockParser;
 use Wordvel\WordPress\ManifestBlockRepository;
 use Wordvel\WordPress\MediaRepository;
+use Wordvel\WordPress\SiteRepository;
 use Wordvel\WordPress\WordPress;
 use Wordvel\WordPress\WordPressPageRepository;
 
@@ -39,6 +40,7 @@ final class WordvelServiceProvider extends ServiceProvider
         $this->app->singleton(ResourceRegistry::class);
         $this->app->singleton(ResourceRepository::class);
         $this->app->singleton(MediaRepository::class);
+        $this->app->singleton(SiteRepository::class);
     }
 
     public function boot(): void
