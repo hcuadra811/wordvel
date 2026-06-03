@@ -222,7 +222,15 @@ add_action('admin_enqueue_scripts', static function (string $hook): void {
             'schema' => $schema,
             'resources' => wordvel_resource_schemas(),
             'apiBaseUrl' => untrailingslashit($apiBaseUrl),
+            'adminUrl' => admin_url('admin.php'),
+            'adminPage' => 'wordvel-resource-' . $resourceKey,
             'initialId' => isset($_GET['record']) ? sanitize_text_field((string) $_GET['record']) : null,
+            'initialLanguage' => isset($_GET['lang']) ? sanitize_text_field((string) $_GET['lang']) : null,
+            'defaultLanguage' => 'en',
+            'languages' => [
+                ['code' => 'en', 'label' => 'English'],
+                ['code' => 'es', 'label' => 'Spanish'],
+            ],
         ]) . ';',
         'before',
     );

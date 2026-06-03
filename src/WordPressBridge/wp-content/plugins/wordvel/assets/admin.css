@@ -1,0 +1,786 @@
+.wordvel-resource-editor-root {
+    max-width: 1280px;
+}
+
+.wordvel-resource-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+    max-width: 1180px;
+    margin-top: 18px;
+}
+
+.wordvel-resource-overview-card {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    min-height: 360px;
+    padding: 14px;
+    border: 1px solid #c3c4c7;
+    background: #fff;
+    color: #1d2327;
+}
+
+.wordvel-resource-overview-card:hover {
+    border-color: #2271b1;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.wordvel-resource-overview-card-header {
+    display: grid;
+    gap: 4px;
+}
+
+.wordvel-resource-overview-card-header span {
+    color: #646970;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.wordvel-resource-overview-card-header strong {
+    font-size: 22px;
+    line-height: 1.1;
+}
+
+.wordvel-resource-overview-card small {
+    color: #646970;
+}
+
+.wordvel-resource-overview-feature {
+    display: grid;
+    gap: 10px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.wordvel-resource-overview-feature img,
+.wordvel-resource-overview-placeholder {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border: 1px solid #dcdcde;
+    background: #f6f7f7;
+    object-fit: cover;
+}
+
+.wordvel-resource-overview-placeholder {
+    display: grid;
+    place-items: center;
+    color: #646970;
+}
+
+.wordvel-resource-overview-placeholder .dashicons {
+    width: 38px;
+    height: 38px;
+    font-size: 38px;
+}
+
+.wordvel-resource-overview-feature > span {
+    display: grid;
+    gap: 3px;
+}
+
+.wordvel-resource-overview-feature > span strong {
+    font-size: 16px;
+    line-height: 1.25;
+}
+
+.wordvel-resource-overview-controls {
+    display: grid;
+    grid-template-columns: 32px 1fr 32px;
+    align-items: center;
+    gap: 6px;
+}
+
+.wordvel-resource-overview-controls > span {
+    color: #646970;
+    font-size: 12px;
+    text-align: center;
+}
+
+.wordvel-resource-overview-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scroll-snap-type: x mandatory;
+}
+
+.wordvel-resource-overview-strip button {
+    display: grid;
+    grid-template-columns: 36px minmax(92px, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-width: 170px;
+    padding: 6px;
+    border: 1px solid #dcdcde;
+    background: #fff;
+    color: #1d2327;
+    text-align: left;
+    cursor: pointer;
+    scroll-snap-align: start;
+}
+
+.wordvel-resource-overview-strip button.is-active,
+.wordvel-resource-overview-strip button:hover {
+    border-color: #2271b1;
+    background: #f6f7f7;
+}
+
+.wordvel-resource-overview-strip img,
+.wordvel-resource-overview-strip .dashicons {
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+}
+
+.wordvel-resource-overview-strip strong {
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wordvel-resource-app {
+    display: grid;
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.wordvel-resource-list,
+.wordvel-resource-form {
+    box-sizing: border-box;
+    border: 1px solid #c3c4c7;
+    background: #fff;
+}
+
+.wordvel-resource-list {
+    min-height: 360px;
+}
+
+.wordvel-resource-list-header,
+.wordvel-resource-form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #dcdcde;
+}
+
+.wordvel-resource-list-header h2,
+.wordvel-resource-form-header h2 {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.3;
+}
+
+.wordvel-language-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    color: #50575e;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.wordvel-language-switcher select {
+    min-height: 30px;
+    max-width: 140px;
+    text-transform: none;
+}
+
+.wordvel-resource-records {
+    margin: 0;
+    padding: 0;
+}
+
+.wordvel-resource-records li {
+    margin: 0;
+}
+
+.wordvel-resource-records button {
+    display: block;
+    width: 100%;
+    padding: 11px 14px;
+    border: 0;
+    border-bottom: 1px solid #f0f0f1;
+    background: transparent;
+    color: #1d2327;
+    text-align: left;
+    cursor: pointer;
+}
+
+.wordvel-resource-records button:hover,
+.wordvel-resource-records button.is-active {
+    background: #f6f7f7;
+}
+
+.wordvel-resource-fields {
+    display: grid;
+    gap: 18px;
+    padding: 18px;
+}
+
+.wordvel-resource-field {
+    display: grid;
+    gap: 7px;
+}
+
+.wordvel-resource-field > label,
+.wordvel-resource-label {
+    color: #1d2327;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-transform: uppercase;
+}
+
+.wordvel-resource-field input[type="text"],
+.wordvel-resource-field input[type="url"],
+.wordvel-resource-field input[type="number"],
+.wordvel-resource-field select,
+.wordvel-resource-field textarea {
+    width: 100%;
+    max-width: 720px;
+}
+
+.wordvel-resource-media {
+    display: grid;
+    max-width: 720px;
+    gap: 8px;
+}
+
+.wordvel-resource-media-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.wordvel-resource-media-preview img {
+    width: 112px;
+    height: 82px;
+    object-fit: cover;
+    border: 1px solid #dcdcde;
+    background: #f6f7f7;
+}
+
+.wordvel-resource-media-preview video {
+    width: 220px;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid #dcdcde;
+    background: #000;
+}
+
+.wordvel-repeater-field,
+.wordvel-group-field {
+    display: grid;
+    max-width: 860px;
+    gap: 10px;
+}
+
+.wordvel-repeater-rows {
+    display: grid;
+    max-height: 520px;
+    overflow: auto;
+    border: 1px solid #dcdcde;
+    background: #fff;
+}
+
+.wordvel-repeater-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+    border-bottom: 1px solid #f0f0f1;
+    background: #fff;
+}
+
+.wordvel-repeater-row:last-child {
+    border-bottom: 0;
+}
+
+.wordvel-repeater-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 10px 10px 10px 0;
+}
+
+.wordvel-repeater-row-fields,
+.wordvel-group-field {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 10px;
+}
+
+.wordvel-repeater-row-fields-2 {
+    grid-template-columns: minmax(90px, 25%) minmax(0, 75%);
+    align-items: start;
+    gap: 8px;
+}
+
+.wordvel-nested-field {
+    display: grid;
+    gap: 5px;
+    color: #1d2327;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.wordvel-nested-field textarea,
+.wordvel-nested-field input,
+.wordvel-nested-field select {
+    width: 100%;
+    max-width: none;
+    min-height: 36px;
+    font-size: 13px;
+    font-weight: 400;
+    text-transform: none;
+}
+
+.wordvel-nested-field textarea {
+    resize: vertical;
+}
+
+.wordvel-repeater-row-fields-2 .wordvel-nested-field {
+    gap: 0;
+}
+
+.wordvel-repeater-row-fields-2 .wordvel-nested-field > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.wordvel-repeater-row-fields-2 .wordvel-nested-field textarea {
+    height: 36px;
+    min-height: 36px;
+    resize: vertical;
+}
+
+.wordvel-group-field .wordvel-nested-field:has(textarea),
+.wordvel-repeater-row-fields:not(.wordvel-repeater-row-fields-2) .wordvel-nested-field:has(textarea) {
+    grid-column: 1 / -1;
+}
+
+.wordvel-resource-relation-selected {
+    display: grid;
+    max-width: 720px;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.wordvel-combobox {
+    position: relative;
+    display: grid;
+    max-width: 720px;
+    gap: 8px;
+}
+
+.wordvel-combobox input {
+    max-width: none;
+}
+
+.wordvel-combobox-input {
+    display: flex;
+    max-width: 720px;
+}
+
+.wordvel-combobox-input input {
+    flex: 1;
+    min-width: 0;
+    border-right: 0;
+}
+
+.wordvel-combobox-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    min-height: 30px;
+    border: 1px solid #8c8f94;
+    background: #fff;
+    color: #1d2327;
+    cursor: pointer;
+}
+
+.wordvel-combobox-toggle:hover,
+.wordvel-combobox-toggle:focus {
+    border-color: #2271b1;
+    color: #2271b1;
+}
+
+.wordvel-combobox-toggle .dashicons {
+    transition: transform 0.12s ease;
+}
+
+.wordvel-combobox.is-open .wordvel-combobox-toggle .dashicons {
+    transform: rotate(180deg);
+}
+
+.wordvel-relation-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 720px;
+}
+
+.wordvel-combobox-menu {
+    position: absolute;
+    z-index: 100;
+    top: 100%;
+    right: 0;
+    left: 0;
+    max-height: 280px;
+    overflow: auto;
+    border: 1px solid #8c8f94;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.wordvel-combobox-menu[hidden] {
+    display: none;
+}
+
+.wordvel-combobox-options {
+    display: grid;
+}
+
+.wordvel-combobox-options button,
+.wordvel-combobox-create {
+    display: block;
+    width: 100%;
+    padding: 9px 10px;
+    border: 0;
+    border-bottom: 1px solid #f0f0f1;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.wordvel-combobox-options button:hover,
+.wordvel-combobox-options button.is-selected,
+.wordvel-combobox-create:hover {
+    background: #f6f7f7;
+}
+
+.wordvel-combobox-empty {
+    margin: 0;
+    padding: 10px;
+    color: #646970;
+}
+
+.wordvel-combobox-create {
+    color: #2271b1;
+    font-weight: 600;
+}
+
+.wordvel-resource-relation-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #dcdcde;
+    background: #f6f7f7;
+    transition:
+        background-color 120ms ease,
+        opacity 120ms ease,
+        transform 120ms ease;
+}
+
+.wordvel-resource-relation-row::before,
+.wordvel-resource-relation-row::after {
+    position: absolute;
+    right: 10px;
+    left: 10px;
+    display: block;
+    height: 2px;
+    background: #646970;
+    content: "";
+    opacity: 0;
+    transform: scaleX(0.94);
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease;
+}
+
+.wordvel-resource-relation-row::before {
+    top: -5px;
+}
+
+.wordvel-resource-relation-row::after {
+    bottom: -5px;
+}
+
+.wordvel-resource-relation-row.drop-before::before,
+.wordvel-resource-relation-row.drop-after::after {
+    opacity: 1;
+    transform: scaleX(1);
+}
+
+.wordvel-resource-relation-row.is-dragging {
+    opacity: 0.45;
+}
+
+.wordvel-resource-relation-selected.is-sortable .wordvel-resource-relation-row {
+    cursor: grab;
+}
+
+.wordvel-drag-handle {
+    color: #646970;
+    font-size: 16px;
+    line-height: 1;
+    cursor: grab;
+}
+
+.wordvel-resource-relation-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.wordvel-resource-relation-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.wordvel-repeater-rows.is-sortable {
+    display: grid;
+    max-width: 860px;
+    max-height: none;
+    overflow: visible;
+    gap: 6px;
+    border: 0;
+    background: transparent;
+}
+
+.wordvel-repeater-rows.is-sortable.is-scrollable .wordvel-repeater-sortable-list {
+    max-height: calc(var(--wordvel-repeater-max-rows, 10) * 52px);
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.wordvel-repeater-sortable-list {
+    display: grid;
+    gap: 6px;
+}
+
+.wordvel-repeater-sortable-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.wordvel-repeater-sortable-item::before,
+.wordvel-repeater-sortable-item::after {
+    position: absolute;
+    right: 42px;
+    left: 0;
+    display: block;
+    height: 2px;
+    background: #646970;
+    content: "";
+    opacity: 0;
+    transform: scaleX(0.94);
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease;
+    pointer-events: none;
+}
+
+.wordvel-repeater-sortable-item::before {
+    top: -4px;
+}
+
+.wordvel-repeater-sortable-item::after {
+    bottom: -4px;
+}
+
+.wordvel-repeater-sortable-item.drop-before::before,
+.wordvel-repeater-sortable-item.drop-after::after {
+    opacity: 1;
+    transform: scaleX(1);
+}
+
+.wordvel-repeater-sortable-item.is-dragging {
+    opacity: 0.45;
+}
+
+.wordvel-repeater-sortable-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #dcdcde;
+    background: #f6f7f7;
+    transition:
+        background-color 120ms ease,
+        opacity 120ms ease,
+        transform 120ms ease;
+}
+
+.wordvel-repeater-rows.is-sortable .wordvel-drag-handle {
+    cursor: grab;
+}
+
+.wordvel-repeater-insert-after {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #c3c4c7;
+    border-radius: 50%;
+    padding: 0;
+    background: #fff;
+    color: #2271b1;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    cursor: pointer;
+    transition:
+        opacity 120ms ease,
+        background-color 120ms ease,
+        border-color 120ms ease;
+}
+
+.wordvel-repeater-sortable-item:hover .wordvel-repeater-insert-after,
+.wordvel-repeater-insert-after:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.wordvel-repeater-insert-after:hover,
+.wordvel-repeater-insert-after:focus-visible {
+    border-color: #2271b1;
+    background: #f0f6fc;
+}
+
+.wordvel-repeater-sortable-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.wordvel-repeater-sortable-body .wordvel-repeater-row-fields {
+    padding: 0;
+}
+
+.wordvel-repeater-sortable-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-top: 2px;
+}
+
+.wordvel-icon-button.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
+}
+
+.wordvel-icon-button.is-destructive {
+    color: #646970;
+}
+
+.wordvel-resource-relation-actions .wordvel-icon-button.button {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+.wordvel-resource-relation-actions .wordvel-icon-button.button:hover,
+.wordvel-resource-relation-actions .wordvel-icon-button.button:focus {
+    border-color: transparent;
+    background: #fff;
+    color: #1d2327;
+}
+
+.wordvel-modal-backdrop {
+    position: fixed;
+    z-index: 100000;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.36);
+}
+
+.wordvel-modal {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: min(760px, 100%);
+    max-height: calc(100vh - 64px);
+    border: 1px solid #c3c4c7;
+    background: #fff;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.wordvel-modal-header,
+.wordvel-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #dcdcde;
+}
+
+.wordvel-modal-header h2 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.wordvel-modal-body {
+    display: grid;
+    gap: 16px;
+    overflow: auto;
+    padding: 16px;
+}
+
+.wordvel-modal-actions {
+    justify-content: flex-end;
+    border-top: 1px solid #dcdcde;
+    border-bottom: 0;
+    background: #f6f7f7;
+}
+
+.wordvel-resource-actions {
+    position: sticky;
+    top: 32px;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 10px 18px;
+    border-bottom: 1px solid #dcdcde;
+    background: #f6f7f7;
+}
+
+.wordvel-resource-notice {
+    margin: 0 0 12px;
+}
+
+@media (max-width: 960px) {
+    .wordvel-resource-app {
+        grid-template-columns: 1fr;
+    }
+}

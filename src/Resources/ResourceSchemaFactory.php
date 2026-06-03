@@ -244,9 +244,7 @@ final class ResourceSchemaFactory
             ? $declaringClass->getProperty($parameter->getName())
             : null;
 
-        $attribute = $parameter->getAttributes(DataCollectionOf::class)[0]
-            ?? $property?->getAttributes(DataCollectionOf::class)[0]
-            ?? null;
+        $attribute = $property?->getAttributes(DataCollectionOf::class)[0] ?? null;
 
         if ($attribute !== null) {
             /** @var DataCollectionOf $collection */

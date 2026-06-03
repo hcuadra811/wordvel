@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Wordvel\Resources\ResourceRegistry;
 use Wordvel\Resources\ResourceRepository;
+use Wordvel\Support\LocalizedValue;
 
 final class ResourceController
 {
@@ -40,6 +41,7 @@ final class ResourceController
                 $request->string('search')->toString(),
                 $request->boolean('summary'),
                 $request->boolean('summary_preview'),
+                LocalizedValue::languageFromRequest($request),
             ),
         ]);
     }
@@ -52,17 +54,17 @@ final class ResourceController
 
         return response()->json([
             'status' => true,
-            'data' => $this->repository->store($schema, $request->input('values', [])),
+            'data' => $this->repository->store($schema, $request->input('values', []), LocalizedValue::languageFromRequest($request)),
         ], 201);
     }
 
-    public function show(string $resource, int|string $id): JsonResponse
+    public function show(Request $request, string $resource, int|string $id): JsonResponse
     {
         $schema = $this->resources->find($resource);
 
         abort_if($schema === null, 404, 'WordVel resource not found.');
 
-        $record = $this->repository->find($schema, $id);
+        $record = $this->repository->find($schema, $id, LocalizedValue::languageFromRequest($request));
 
         abort_if($record === null, 404, 'WordVel resource record not found.');
 
@@ -78,7 +80,7 @@ final class ResourceController
 
         abort_if($schema === null, 404, 'WordVel resource not found.');
 
-        $record = $this->repository->update($schema, $id, $request->input('values', []));
+        $record = $this->repository->update($schema, $id, $request->input('values', []), LocalizedValue::languageFromRequest($request));
 
         abort_if($record === null, 404, 'WordVel resource record not found.');
 
@@ -110,6 +112,7 @@ final class ResourceController
                 $resource,
                 $request->string('search')->toString(),
                 $request->input('ids', []),
+                LocalizedValue::languageFromRequest($request),
             ),
         ]);
     }
@@ -125,6 +128,7 @@ final class ResourceController
             $id,
             $field,
             $request->input('media', []),
+            LocalizedValue::languageFromRequest($request),
         );
 
         abort_if($record === null, 404, 'WordVel resource record not found.');
@@ -146,6 +150,7 @@ final class ResourceController
             $id,
             $field,
             $request->input('values', []),
+            LocalizedValue::languageFromRequest($request),
         );
 
         abort_if($record === null, 404, 'WordVel resource record not found.');

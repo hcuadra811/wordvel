@@ -176,6 +176,23 @@
     line-height: 1.3;
 }
 
+.wordvel-language-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    color: #50575e;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.wordvel-language-switcher select {
+    min-height: 30px;
+    max-width: 140px;
+    text-transform: none;
+}
+
 .wordvel-resource-records {
     margin: 0;
     padding: 0;
@@ -257,6 +274,104 @@
     aspect-ratio: 16 / 9;
     border: 1px solid #dcdcde;
     background: #000;
+}
+
+.wordvel-repeater-field,
+.wordvel-group-field {
+    display: grid;
+    max-width: 860px;
+    gap: 10px;
+}
+
+.wordvel-repeater-rows {
+    display: grid;
+    max-height: 520px;
+    overflow: auto;
+    border: 1px solid #dcdcde;
+    background: #fff;
+}
+
+.wordvel-repeater-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+    border-bottom: 1px solid #f0f0f1;
+    background: #fff;
+}
+
+.wordvel-repeater-row:last-child {
+    border-bottom: 0;
+}
+
+.wordvel-repeater-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 10px 10px 10px 0;
+}
+
+.wordvel-repeater-row-fields,
+.wordvel-group-field {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 10px;
+}
+
+.wordvel-repeater-row-fields-2 {
+    grid-template-columns: minmax(90px, 25%) minmax(0, 75%);
+    align-items: start;
+    gap: 8px;
+}
+
+.wordvel-nested-field {
+    display: grid;
+    gap: 5px;
+    color: #1d2327;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.wordvel-nested-field textarea,
+.wordvel-nested-field input,
+.wordvel-nested-field select {
+    width: 100%;
+    max-width: none;
+    min-height: 36px;
+    font-size: 13px;
+    font-weight: 400;
+    text-transform: none;
+}
+
+.wordvel-nested-field textarea {
+    resize: vertical;
+}
+
+.wordvel-repeater-row-fields-2 .wordvel-nested-field {
+    gap: 0;
+}
+
+.wordvel-repeater-row-fields-2 .wordvel-nested-field > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.wordvel-repeater-row-fields-2 .wordvel-nested-field textarea {
+    height: 36px;
+    min-height: 36px;
+    resize: vertical;
+}
+
+.wordvel-group-field .wordvel-nested-field:has(textarea),
+.wordvel-repeater-row-fields:not(.wordvel-repeater-row-fields-2) .wordvel-nested-field:has(textarea) {
+    grid-column: 1 / -1;
 }
 
 .wordvel-resource-relation-selected {
@@ -442,6 +557,137 @@
     gap: 4px;
 }
 
+.wordvel-repeater-rows.is-sortable {
+    display: grid;
+    max-width: 860px;
+    max-height: none;
+    overflow: visible;
+    gap: 6px;
+    border: 0;
+    background: transparent;
+}
+
+.wordvel-repeater-rows.is-sortable.is-scrollable .wordvel-repeater-sortable-list {
+    max-height: calc(var(--wordvel-repeater-max-rows, 10) * 52px);
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.wordvel-repeater-sortable-list {
+    display: grid;
+    gap: 6px;
+}
+
+.wordvel-repeater-sortable-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.wordvel-repeater-sortable-item::before,
+.wordvel-repeater-sortable-item::after {
+    position: absolute;
+    right: 42px;
+    left: 0;
+    display: block;
+    height: 2px;
+    background: #646970;
+    content: "";
+    opacity: 0;
+    transform: scaleX(0.94);
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease;
+    pointer-events: none;
+}
+
+.wordvel-repeater-sortable-item::before {
+    top: -4px;
+}
+
+.wordvel-repeater-sortable-item::after {
+    bottom: -4px;
+}
+
+.wordvel-repeater-sortable-item.drop-before::before,
+.wordvel-repeater-sortable-item.drop-after::after {
+    opacity: 1;
+    transform: scaleX(1);
+}
+
+.wordvel-repeater-sortable-item.is-dragging {
+    opacity: 0.45;
+}
+
+.wordvel-repeater-sortable-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #dcdcde;
+    background: #f6f7f7;
+    transition:
+        background-color 120ms ease,
+        opacity 120ms ease,
+        transform 120ms ease;
+}
+
+.wordvel-repeater-rows.is-sortable .wordvel-drag-handle {
+    cursor: grab;
+}
+
+.wordvel-repeater-insert-after {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #c3c4c7;
+    border-radius: 50%;
+    padding: 0;
+    background: #fff;
+    color: #2271b1;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    cursor: pointer;
+    transition:
+        opacity 120ms ease,
+        background-color 120ms ease,
+        border-color 120ms ease;
+}
+
+.wordvel-repeater-sortable-item:hover .wordvel-repeater-insert-after,
+.wordvel-repeater-insert-after:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.wordvel-repeater-insert-after:hover,
+.wordvel-repeater-insert-after:focus-visible {
+    border-color: #2271b1;
+    background: #f0f6fc;
+}
+
+.wordvel-repeater-sortable-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.wordvel-repeater-sortable-body .wordvel-repeater-row-fields {
+    padding: 0;
+}
+
+.wordvel-repeater-sortable-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-top: 2px;
+}
+
 .wordvel-icon-button.button {
     display: inline-flex;
     align-items: center;
@@ -519,10 +765,13 @@
 }
 
 .wordvel-resource-actions {
+    position: sticky;
+    top: 32px;
+    z-index: 10;
     display: flex;
     gap: 8px;
-    padding: 14px 18px;
-    border-top: 1px solid #dcdcde;
+    padding: 10px 18px;
+    border-bottom: 1px solid #dcdcde;
     background: #f6f7f7;
 }
 

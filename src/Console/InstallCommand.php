@@ -304,11 +304,11 @@ PHP;
 
     private function installWordPressBridge(Filesystem $files, string $wordpressPath): void
     {
-        $source = dirname(__DIR__, 2) . '/testing/wordpress/wp-content';
+        $source = dirname(__DIR__) . '/WordPressBridge/wp-content';
         $contentPath = $wordpressPath . '/wp-content';
 
         if (! $files->isDirectory($source)) {
-            $this->warn('WordPress bridge proof assets were not found; skipping bridge plugin/theme scaffold.');
+            $this->warn('WordPress bridge assets were not found; skipping bridge plugin/theme scaffold.');
 
             return;
         }

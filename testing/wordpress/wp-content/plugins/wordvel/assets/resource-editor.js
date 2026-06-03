@@ -11,6 +11,26 @@
         return;
     }
 
+    var languageStorageKey = 'wordvel-resource-language';
+    var languages = normalizeLanguages(config.languages);
+    var pendingRichTextEditors = {};
+
+    function isTimecodeField(field) {
+        return !!(field && field.type === 'number' && field.options && field.options.format === 'timecode');
+    }
+
+    function renderTimecodeInput(field, value, onChange, extras) {
+        return element('input', Object.assign({
+            type: 'text',
+            value: value == null ? '' : String(value),
+            placeholder: '0:00:000',
+            title: 'Minutes:seconds:milliseconds (e.g. 0:23:700)',
+            oninput: function (event) {
+                onChange(event.target.value);
+            }
+        }, extras || {}));
+    }
+
     var state = {
         records: [],
         active: null,
@@ -26,9 +46,12 @@
         drag: null,
         dragOver: null,
         notice: null,
+        language: readStoredLanguage(),
         isLoading: false,
         isSaving: false
     };
+
+    var loadRecordRequestId = 0;
 
     document.addEventListener('mousedown', function (event) {
         if (!state.relationOpen || event.target.closest('.wordvel-combobox')) {
@@ -39,10 +62,11 @@
     });
 
     function request(path, options) {
-        return window.fetch(config.apiBaseUrl + path, Object.assign({
+        return window.fetch(config.apiBaseUrl + pathWithLanguage(path), Object.assign({
             headers: {
                 Accept: 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Wordvel-Language': state.language
             },
             credentials: 'omit'
         }, options || {})).then(function (response) {
@@ -56,21 +80,230 @@
         });
     }
 
-    function loadRecords() {
-        state.isLoading = true;
-        render();
+    function pathWithLanguage(path) {
+        var separator = path.indexOf('?') === -1 ? '?' : '&';
+
+        return path + separator + 'lang=' + encodeURIComponent(state.language);
+    }
+
+    function normalizeLanguages(rawLanguages) {
+        var fallback = [
+            { code: 'en', label: 'English' },
+            { code: 'es', label: 'Spanish' }
+        ];
+
+        if (!Array.isArray(rawLanguages) || !rawLanguages.length) {
+            return fallback;
+        }
+
+        return rawLanguages
+            .map(function (language) {
+                if (typeof language === 'string') {
+                    return { code: language, label: language.toUpperCase() };
+                }
+
+                return {
+                    code: String(language.code || language.value || '').slice(0, 8),
+                    label: String(language.label || language.name || language.code || language.value || '')
+                };
+            })
+            .filter(function (language) {
+                return language.code && language.label;
+            });
+    }
+
+    function readStoredLanguage() {
+        var stored = window.localStorage.getItem(languageStorageKey);
+        var defaultLanguage = config.defaultLanguage || (languages[0] && languages[0].code) || 'en';
+        var urlLanguage = config.initialLanguage || new URLSearchParams(window.location.search).get('lang');
+
+        if (urlLanguage && languages.some(function (language) { return language.code === urlLanguage; })) {
+            return urlLanguage;
+        }
+
+        return languages.some(function (language) { return language.code === stored; }) ? stored : defaultLanguage;
+    }
+
+    function readRecordIdFromUrl() {
+        var recordId = new URLSearchParams(window.location.search).get('record');
+
+        return recordId ? String(recordId) : null;
+    }
+
+    function syncEditorUrl(recordId, options) {
+        if (!config.adminUrl || !config.adminPage) {
+            return;
+        }
+
+        var params = new URLSearchParams();
+        params.set('page', config.adminPage);
+
+        if (recordId) {
+            params.set('record', String(recordId));
+        }
+
+        if (state.language) {
+            params.set('lang', state.language);
+        }
+
+        var nextUrl = config.adminUrl + (config.adminUrl.indexOf('?') === -1 ? '?' : '&') + params.toString();
+        var currentUrl = window.location.href.split('#')[0];
+
+        if (currentUrl === nextUrl) {
+            return;
+        }
+
+        var historyState = {
+            wordvelRecordId: recordId || null,
+            wordvelLanguage: state.language
+        };
+        var usePush = !!(options && options.push);
+
+        if (usePush && window.history.pushState) {
+            window.history.pushState(historyState, '', nextUrl);
+            return;
+        }
+
+        window.history.replaceState(historyState, '', nextUrl);
+    }
+
+    function restoreEditorFromUrl() {
+        var recordId = readRecordIdFromUrl();
+
+        if (recordId) {
+            if (!state.active || String(state.active.id) !== String(recordId)) {
+                loadRecord(recordId);
+            }
+
+            return;
+        }
+
+        if (state.active) {
+            state.active = null;
+            state.values = emptyValues();
+            state.notice = null;
+            syncEditorUrl(null);
+            render();
+        }
+    }
+
+    function hasLocalizedFields(schema) {
+        return !!(schema && Array.isArray(schema.fields) && schema.fields.some(function (field) {
+            return isLocalizedField(field) || hasLocalizedFields(field);
+        }));
+    }
+
+    function hasAnyLocalizedFields() {
+        return hasLocalizedFields(config.schema) || (config.resources || []).some(hasLocalizedFields);
+    }
+
+    function isLocalizedField(field) {
+        return !!(field && field.options && field.options.localized === true);
+    }
+
+    function localizedObject(value) {
+        var object = {};
+
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            object = Object.assign({}, value);
+        } else if (value != null && value !== '') {
+            object.en = String(value);
+            object.es = String(value);
+        }
+
+        languages.forEach(function (language) {
+            if (object[language.code] == null) {
+                object[language.code] = object.en || object.es || '';
+            }
+        });
+
+        return object;
+    }
+
+    function fieldValue(field, values) {
+        var value = (values || state.values)[field.key];
+
+        if (!isLocalizedField(field)) {
+            return value;
+        }
+
+        value = localizedObject(value);
+
+        return value[state.language] || value.en || value.es || '';
+    }
+
+    function setFieldValue(field, value) {
+        if (!isLocalizedField(field)) {
+            setValue(field.key, value);
+            return;
+        }
+
+        var localized = localizedObject(state.values[field.key]);
+        localized[state.language] = value;
+        setValue(field.key, localized);
+    }
+
+    function setModalFieldValue(field, value) {
+        var modal = state.modal;
+
+        if (!modal) {
+            return;
+        }
+
+        modal.values = Object.assign({}, modal.values);
+
+        if (!isLocalizedField(field)) {
+            modal.values[field.key] = value;
+            return;
+        }
+
+        var localized = localizedObject(modal.values[field.key]);
+        localized[state.language] = value;
+        modal.values[field.key] = localized;
+    }
+
+    function changeLanguage(nextLanguage) {
+        if (!nextLanguage || nextLanguage === state.language) {
+            return;
+        }
+
+        syncRichTextEditors();
+        state.language = nextLanguage;
+        window.localStorage.setItem(languageStorageKey, state.language);
+        state.options = {};
+        state.optionLabels = {};
+        state.relationSearch = {};
+        syncEditorUrl(state.active && state.active.id ? state.active.id : null);
+        refreshLocalizedControls();
+        loadRecords({ silent: true });
+    }
+
+    function loadRecords(options) {
+        var silent = !!(options && options.silent);
+
+        if (!silent) {
+            state.isLoading = true;
+            render();
+        }
 
         return request('/' + config.resourceKey + '?summary=1')
             .then(function (records) {
                 state.records = Array.isArray(records) ? records : [];
                 state.notice = null;
 
-                if (!state.active && config.initialId) {
-                    return loadRecord(config.initialId);
+                var recordId = readRecordIdFromUrl() || config.initialId;
+
+                if (!state.active && recordId) {
+                    return loadRecord(recordId);
                 }
 
                 if (!state.active && state.records[0]) {
+                    syncEditorUrl(state.records[0].id);
                     return loadRecord(state.records[0].id);
+                }
+
+                if (!state.active) {
+                    syncEditorUrl(null);
                 }
 
                 if (state.active && state.active.id) {
@@ -87,25 +320,39 @@
             })
             .finally(function () {
                 state.isLoading = false;
-                render();
+                if (!silent) {
+                    render();
+                }
             });
     }
 
     function loadRecord(id) {
-        state.isLoading = true;
-        render();
+        var requestId = ++loadRecordRequestId;
+        var canRefreshForm = !!root.querySelector('.wordvel-resource-form');
 
         return request('/' + config.resourceKey + '/' + encodeURIComponent(id))
             .then(function (record) {
+                if (requestId !== loadRecordRequestId) {
+                    return;
+                }
+
                 state.active = record;
                 state.values = Object.assign({}, record.values || {});
                 state.notice = null;
+                syncEditorUrl(record.id);
+
+                if (canRefreshForm) {
+                    preserveScroll(refreshRecordForm);
+                } else {
+                    render();
+                }
             })
             .catch(function (error) {
+                if (requestId !== loadRecordRequestId) {
+                    return;
+                }
+
                 state.notice = { type: 'error', message: error.message };
-            })
-            .finally(function () {
-                state.isLoading = false;
                 render();
             });
     }
@@ -174,7 +421,9 @@
             return;
         }
 
-        loadRelationshipOptions(field).then(render);
+        loadRelationshipOptions(field).then(function () {
+            refreshField(field);
+        });
     }
 
     function searchRelationshipPicker(field, value) {
@@ -189,7 +438,10 @@
 
         state.relationTimers[field.key] = window.setTimeout(function () {
             state.options[field.key] = null;
-            loadRelationshipOptions(field).then(render);
+            loadRelationshipOptions(field).then(function () {
+                refreshField(field);
+                restoreRelationshipFocus();
+            });
         }, 160);
     }
 
@@ -304,13 +556,23 @@
     }
 
     function emptyValues() {
-        return (config.schema.fields || []).reduce(function (values, field) {
+        return emptyValuesForFields(config.schema.fields || []);
+    }
+
+    function emptyValuesForFields(fields) {
+        return (fields || []).reduce(function (values, field) {
             if (field.type === 'media') {
                 values[field.key] = field.options && field.options.multiple ? [] : null;
             } else if (field.type === 'relationship') {
                 values[field.key] = field.options && field.options.multiple ? [] : '';
+            } else if (field.type === 'repeater') {
+                values[field.key] = [];
+            } else if (field.type === 'group') {
+                values[field.key] = emptyValuesForFields(field.fields || []);
             } else if (field.type === 'boolean') {
                 values[field.key] = false;
+            } else if (isLocalizedField(field)) {
+                values[field.key] = localizedObject(field.default);
             } else {
                 values[field.key] = field.default == null ? '' : field.default;
             }
@@ -325,6 +587,7 @@
     }
 
     function selectRecord(record) {
+        syncEditorUrl(record.id, { push: true });
         loadRecord(record.id);
     }
 
@@ -332,6 +595,7 @@
         state.active = null;
         state.values = emptyValues();
         state.notice = null;
+        syncEditorUrl(null);
         render();
     }
 
@@ -352,6 +616,7 @@
                 state.notice = { type: 'success', message: config.schema.label + ' saved.' };
                 state.active = record;
                 state.values = Object.assign({}, record.values || {});
+                syncEditorUrl(record.id);
 
                 return loadRecords();
             })
@@ -379,6 +644,7 @@
                 state.active = null;
                 state.values = emptyValues();
                 state.notice = { type: 'success', message: config.schema.label + ' deleted.' };
+                syncEditorUrl(null);
 
                 return loadRecords();
             })
@@ -392,6 +658,7 @@
     }
 
     function render() {
+        destroyRichTextEditors();
         root.innerHTML = '';
         root.appendChild(element('div', {}, [
             element('div', { className: 'wordvel-resource-app' }, [
@@ -418,6 +685,7 @@
                         element('button', {
                             type: 'button',
                             className: state.active && state.active.id === record.id ? 'is-active' : '',
+                            'data-wordvel-record-id': record.id,
                             onclick: function () {
                                 selectRecord(record);
                             }
@@ -430,40 +698,87 @@
     function renderForm() {
         return element('section', { className: 'wordvel-resource-form' }, [
             element('div', { className: 'wordvel-resource-form-header' }, [
-                element('h2', {}, [state.active ? state.active.title : 'New ' + config.schema.label])
+                element('h2', {}, [state.active ? activeRecordTitle() : 'New ' + config.schema.label]),
+                renderLanguageSwitcher()
             ]),
             state.notice ? element('div', {
                 className: 'notice notice-' + (state.notice.type === 'error' ? 'error' : 'success') + ' wordvel-resource-notice'
             }, [element('p', {}, [state.notice.message])]) : null,
-            element('div', { className: 'wordvel-resource-fields' }, (config.schema.fields || []).map(renderField)),
             element('div', { className: 'wordvel-resource-actions' }, [
                 button(state.isSaving ? 'Saving...' : 'Save ' + config.schema.label, 'primary', saveRecord, state.isSaving),
                 state.active ? button('Delete', 'secondary', deleteRecord, state.isSaving, true) : null
-            ])
+            ]),
+            element('div', { className: 'wordvel-resource-fields' }, (config.schema.fields || []).map(renderField))
+        ]);
+    }
+
+    function activeRecordTitle() {
+        var titleFieldKey = config.schema && config.schema.options && config.schema.options.title_field;
+        var fields = config.schema && Array.isArray(config.schema.fields) ? config.schema.fields : [];
+        var titleField = fields.find(function (field) {
+            return titleFieldKey ? field.key === titleFieldKey : ['title', 'name', 'headline'].indexOf(field.key) !== -1;
+        }) || fields[0];
+
+        if (!titleField) {
+            return state.active && state.active.title ? state.active.title : '#' + state.active.id;
+        }
+
+        var title = fieldValue(titleField);
+
+        return title ? String(title) : (state.active && state.active.title ? state.active.title : '#' + state.active.id);
+    }
+
+    function renderLanguageSwitcher() {
+        if (!hasAnyLocalizedFields()) {
+            return null;
+        }
+
+        return element('label', { className: 'wordvel-language-switcher' }, [
+            element('span', {}, ['Language']),
+            element('select', {
+                value: state.language,
+                onchange: function (event) {
+                    changeLanguage(event.target.value);
+                }
+            }, languages.map(function (language) {
+                return element('option', { value: language.code }, [language.label]);
+            }))
         ]);
     }
 
     function renderField(field) {
-        var value = state.values[field.key];
+        var value = fieldValue(field);
 
         if (field.type === 'rich_text') {
             return fieldWrap(field, [
                 element('textarea', {
                     id: editorId(field),
+                    'data-wordvel-field-key': field.key,
                     rows: '8',
                     value: value || '',
                     onchange: function (event) {
-                        setValue(field.key, event.target.value);
+                        setFieldValue(field, event.target.value);
                     }
                 })
             ]);
         }
 
         if (field.type === 'number') {
+            if (isTimecodeField(field)) {
+                return fieldWrap(field, [
+                    renderTimecodeInput(field, value, function (nextValue) {
+                        setValue(field.key, nextValue);
+                    }, {
+                        'data-wordvel-field-key': field.key
+                    })
+                ]);
+            }
+
             return fieldWrap(field, [
                 element('input', {
                     type: 'number',
                     value: value == null ? '' : String(value),
+                    'data-wordvel-field-key': field.key,
                     disabled: field.options && field.options.readonly ? 'disabled' : null,
                     oninput: function (event) {
                         setValue(field.key, event.target.value);
@@ -478,6 +793,7 @@
                     element('input', {
                         type: 'checkbox',
                         checked: value ? 'checked' : null,
+                        'data-wordvel-field-key': field.key,
                         onchange: function (event) {
                             setValue(field.key, event.target.checked);
                         }
@@ -493,6 +809,7 @@
             return fieldWrap(field, [
                 element('select', {
                     value: value || '',
+                    'data-wordvel-field-key': field.key,
                     onchange: function (event) {
                         setValue(field.key, event.target.value);
                     }
@@ -510,15 +827,252 @@
             return renderRelationshipField(field, value);
         }
 
+        if (field.type === 'repeater') {
+            return renderRepeaterField(field, value);
+        }
+
+        if (field.type === 'group') {
+            return renderGroupField(field, value);
+        }
+
         return fieldWrap(field, [
             element('input', {
                 type: field.type === 'url' ? 'url' : 'text',
                 value: value || '',
+                'data-wordvel-field-key': field.key,
                 oninput: function (event) {
-                    setValue(field.key, event.target.value);
+                    setFieldValue(field, event.target.value);
                 }
             })
         ]);
+    }
+
+    function renderRepeaterField(field, value) {
+        var rows = Array.isArray(value) ? value : [];
+        var childFields = field.fields || [];
+        var sortable = !!(field.options && field.options.sortable);
+
+        if (sortable) {
+            var maxVisibleRows = field.options && field.options.max_visible_rows;
+            var scrollable = Number.isFinite(maxVisibleRows) && maxVisibleRows > 0;
+            var insertBetween = !!(field.options && field.options.insert_between);
+
+            return fieldWrap(field, [
+                element('div', { className: 'wordvel-repeater-field' }, [
+                    element('div', {
+                        className: 'wordvel-repeater-rows is-sortable' + (scrollable ? ' is-scrollable' : ''),
+                        style: scrollable ? { '--wordvel-repeater-max-rows': String(maxVisibleRows) } : null
+                    }, [
+                        element('div', {
+                            className: 'wordvel-repeater-sortable-list',
+                            'data-wordvel-repeater-scroll': field.key
+                        }, rows.map(function (row, index) {
+                            var isDragging = state.drag && state.drag.kind === 'repeater' && state.drag.fieldKey === field.key && state.drag.index === index;
+                            var dropClass = state.dragOver && state.dragOver.kind === 'repeater' && state.dragOver.fieldKey === field.key && state.dragOver.index === index
+                                ? ' drop-' + state.dragOver.position
+                                : '';
+
+                            return element('div', {
+                                className: 'wordvel-repeater-sortable-item' + (isDragging ? ' is-dragging' : '') + dropClass,
+                                'data-wordvel-repeater-field': field.key
+                            }, [
+                                element('div', { className: 'wordvel-repeater-sortable-row' }, [
+                                    element('span', {
+                                        className: 'wordvel-drag-handle',
+                                        title: 'Drag to reorder',
+                                        onmousedown: function (event) {
+                                            if (event.button != null && event.button !== 0) {
+                                                return;
+                                            }
+
+                                            event.preventDefault();
+                                            startRepeaterDrag(event, field.key, index);
+                                        }
+                                    }, ['⋮⋮']),
+                                    element('div', { className: 'wordvel-repeater-sortable-body' }, [
+                                        element('div', { className: 'wordvel-repeater-row-fields wordvel-repeater-row-fields-' + childFields.length }, childFields.map(function (childField) {
+                                            return renderNestedField(childField, row ? row[childField.key] : null, function (nextValue) {
+                                                updateRepeaterRow(field, index, childField.key, nextValue);
+                                            }, childFields.length === 2);
+                                        }))
+                                    ]),
+                                    element('span', { className: 'wordvel-repeater-sortable-actions' }, [
+                                        iconButton('dashicons-trash', 'Remove', function () {
+                                            removeRepeaterRow(field, index);
+                                        }, false, true)
+                                    ])
+                                ]),
+                                insertBetween ? element('button', {
+                                    type: 'button',
+                                    className: 'wordvel-repeater-insert-after',
+                                    title: 'Insert below',
+                                    'aria-label': 'Insert below',
+                                    onclick: function () {
+                                        insertRepeaterRowAfter(field, index, childFields);
+                                    }
+                                }, ['+']) : null
+                            ]);
+                        }))
+                    ]),
+                    button('Add item', 'small', function () {
+                        setValue(field.key, rows.concat([emptyValuesForFields(childFields)]));
+                        refreshField(field);
+                    })
+                ])
+            ]);
+        }
+
+        return fieldWrap(field, [
+            element('div', { className: 'wordvel-repeater-field' }, [
+                element('div', { className: 'wordvel-repeater-rows' }, rows.map(function (row, index) {
+                    return element('div', { className: 'wordvel-repeater-row' }, [
+                        element('div', { className: 'wordvel-repeater-row-fields wordvel-repeater-row-fields-' + childFields.length }, childFields.map(function (childField) {
+                            return renderNestedField(childField, row ? row[childField.key] : null, function (nextValue) {
+                                updateRepeaterRow(field, index, childField.key, nextValue);
+                            }, childFields.length === 2);
+                        })),
+                        element('div', { className: 'wordvel-repeater-row-actions' }, [
+                            iconButton('dashicons-arrow-up-alt2', 'Move up', function () {
+                                moveRepeaterRow(field, index, -1);
+                            }, index === 0),
+                            iconButton('dashicons-arrow-down-alt2', 'Move down', function () {
+                                moveRepeaterRow(field, index, 1);
+                            }, index === rows.length - 1),
+                            iconButton('dashicons-trash', 'Remove', function () {
+                                removeRepeaterRow(field, index);
+                            }, false, true)
+                        ])
+                    ]);
+                })),
+                button('Add item', 'small', function () {
+                    setValue(field.key, rows.concat([emptyValuesForFields(childFields)]));
+                    refreshField(field);
+                })
+            ])
+        ]);
+    }
+
+    function renderGroupField(field, value) {
+        var row = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+
+        return fieldWrap(field, [
+            element('div', { className: 'wordvel-group-field' }, (field.fields || []).map(function (childField) {
+                return renderNestedField(childField, row[childField.key], function (nextValue) {
+                    var nextRow = Object.assign({}, row);
+                    nextRow[childField.key] = nextValue;
+                    setValue(field.key, nextRow);
+                });
+            }))
+        ]);
+    }
+
+    function renderNestedField(field, value, setValueCallback, compact) {
+        if (field.type === 'number') {
+            if (isTimecodeField(field)) {
+                return nestedFieldWrap(field, renderTimecodeInput(field, value, setValueCallback, {
+                    placeholder: field.label || field.key
+                }));
+            }
+
+            return nestedFieldWrap(field, element('input', {
+                type: 'number',
+                value: value == null ? '' : String(value),
+                placeholder: field.label || field.key,
+                oninput: function (event) {
+                    setValueCallback(event.target.value);
+                }
+            }));
+        }
+
+        if (field.type === 'boolean') {
+            return nestedFieldWrap(field, element('label', {}, [
+                element('input', {
+                    type: 'checkbox',
+                    checked: value ? 'checked' : null,
+                    onchange: function (event) {
+                        setValueCallback(event.target.checked);
+                    }
+                }),
+                ' Enabled'
+            ]));
+        }
+
+        if (field.type === 'textarea' || field.type === 'rich_text') {
+            return nestedFieldWrap(field, element('textarea', {
+                rows: compact ? '1' : '3',
+                value: value || '',
+                placeholder: field.label || field.key,
+                oninput: function (event) {
+                    setValueCallback(event.target.value);
+                }
+            }));
+        }
+
+        if (field.type === 'select') {
+            var options = (field.options && field.options.options) || {};
+
+            return nestedFieldWrap(field, element('select', {
+                value: value || '',
+                onchange: function (event) {
+                    setValueCallback(event.target.value);
+                }
+            }, [element('option', { value: '' }, ['Select one'])].concat(Object.keys(options).map(function (optionValue) {
+                return element('option', { value: optionValue }, [options[optionValue]]);
+            }))));
+        }
+
+        return nestedFieldWrap(field, element('input', {
+            type: field.type === 'url' ? 'url' : 'text',
+            value: value || '',
+            placeholder: field.label || field.key,
+            oninput: function (event) {
+                setValueCallback(event.target.value);
+            }
+        }));
+    }
+
+    function nestedFieldWrap(field, control) {
+        return element('label', { className: 'wordvel-nested-field' }, [
+            element('span', {}, [field.label || field.key]),
+            control
+        ]);
+    }
+
+    function updateRepeaterRow(field, index, childKey, nextValue) {
+        var rows = Array.isArray(state.values[field.key]) ? state.values[field.key].slice() : [];
+        var row = Object.assign({}, rows[index] || {});
+        row[childKey] = nextValue;
+        rows[index] = row;
+        setValue(field.key, rows);
+    }
+
+    function moveRepeaterRow(field, index, direction) {
+        var rows = Array.isArray(state.values[field.key]) ? state.values[field.key].slice() : [];
+        var nextIndex = index + direction;
+
+        if (nextIndex < 0 || nextIndex >= rows.length) {
+            return;
+        }
+
+        var row = rows[index];
+        rows[index] = rows[nextIndex];
+        rows[nextIndex] = row;
+        setValue(field.key, rows);
+        refreshField(field);
+    }
+
+    function removeRepeaterRow(field, index) {
+        var rows = Array.isArray(state.values[field.key]) ? state.values[field.key].slice() : [];
+        rows.splice(index, 1);
+        setValue(field.key, rows);
+        refreshField(field);
+    }
+
+    function insertRepeaterRowAfter(field, index, childFields) {
+        var rows = Array.isArray(state.values[field.key]) ? state.values[field.key].slice() : [];
+        rows.splice(index + 1, 0, emptyValuesForFields(childFields));
+        setValue(field.key, rows);
+        refreshField(field);
     }
 
     function renderMediaField(field, value) {
@@ -563,7 +1117,9 @@
 
         if (selectedIds.some(function (id) { return !labels[id]; })) {
             window.setTimeout(function () {
-                loadRelationshipOptions(field, selectedIds).then(render);
+                loadRelationshipOptions(field, selectedIds).then(function () {
+                    refreshField(field);
+                });
             }, 0);
         }
 
@@ -632,7 +1188,10 @@
                                     state.relationOpen = multiple ? field.key : null;
                                     state.focusedRelation = multiple ? field.key : null;
                                     state.options[field.key] = null;
-                                    loadRelationshipOptions(field).then(render);
+                                    loadRelationshipOptions(field).then(function () {
+                                        refreshField(field);
+                                        restoreRelationshipFocus();
+                                    });
                                 }
                             }, [option.label]);
                         }))
@@ -657,8 +1216,8 @@
                     : null
             ]),
             multiple ? element('div', { className: sortable ? 'wordvel-resource-relation-selected is-sortable' : 'wordvel-resource-relation-selected' }, selected.map(function (option, index) {
-                var isDragging = state.drag && state.drag.fieldKey === field.key && state.drag.index === index;
-                var dropClass = state.dragOver && state.dragOver.fieldKey === field.key && state.dragOver.index === index
+                var isDragging = state.drag && state.drag.kind === 'relationship' && state.drag.fieldKey === field.key && state.drag.index === index;
+                var dropClass = state.dragOver && state.dragOver.kind === 'relationship' && state.dragOver.fieldKey === field.key && state.dragOver.index === index
                     ? ' drop-' + state.dragOver.position
                     : '';
 
@@ -680,7 +1239,7 @@
                             setValue(field.key, selectedIds.filter(function (_, selectedIndex) {
                                 return selectedIndex !== index;
                             }));
-                            render();
+                            refreshField(field);
                         }, false, true)
                     ])
                 ]);
@@ -763,19 +1322,7 @@
     function emptyValuesForSchema(schema) {
         var fields = schema && Array.isArray(schema.fields) ? schema.fields : [];
 
-        return fields.reduce(function (values, field) {
-            if (field.type === 'media') {
-                values[field.key] = field.options && field.options.multiple ? [] : null;
-            } else if (field.type === 'relationship') {
-                values[field.key] = field.options && field.options.multiple ? [] : '';
-            } else if (field.type === 'boolean') {
-                values[field.key] = false;
-            } else {
-                values[field.key] = field.default == null ? '' : field.default;
-            }
-
-            return values;
-        }, {});
+        return emptyValuesForFields(fields);
     }
 
     function openRelationshipMediaCreator(field) {
@@ -882,14 +1429,23 @@
 
     function renderModalField(field) {
         var modal = state.modal;
-        var value = modal.values[field.key];
+        var value = fieldValue(field, modal.values);
         var setModalValue = function (nextValue) {
-            modal.values = Object.assign({}, modal.values);
-            modal.values[field.key] = nextValue;
+            setModalFieldValue(field, nextValue);
             render();
         };
 
         if (field.type === 'number') {
+            if (isTimecodeField(field)) {
+                return fieldWrap(field, [
+                    renderTimecodeInput(field, value, function (nextValue) {
+                        modal.values[field.key] = nextValue;
+                    }, {
+                        disabled: field.options && field.options.readonly ? 'disabled' : null
+                    })
+                ]);
+            }
+
             return fieldWrap(field, [
                 element('input', {
                     type: 'number',
@@ -922,8 +1478,9 @@
                 element('textarea', {
                     rows: '4',
                     value: value || '',
+                    'data-wordvel-field-key': field.key,
                     oninput: function (event) {
-                        modal.values[field.key] = event.target.value;
+                        setModalFieldValue(field, event.target.value);
                     }
                 })
             ]);
@@ -956,8 +1513,9 @@
             element('input', {
                 type: field.type === 'url' ? 'url' : 'text',
                 value: value || '',
+                'data-wordvel-field-key': field.key,
                 oninput: function (event) {
-                    modal.values[field.key] = event.target.value;
+                    setModalFieldValue(field, event.target.value);
                 }
             })
         ]);
@@ -1115,6 +1673,7 @@
 
         event.preventDefault();
         state.drag = {
+            kind: 'relationship',
             fieldKey: fieldKey,
             index: index,
             ids: ids.slice()
@@ -1127,27 +1686,51 @@
             row.classList.add('is-dragging');
         }
 
-        document.addEventListener('mousemove', handleRelationshipDragMove);
-        document.addEventListener('mouseup', finishRelationshipDrag);
+        document.addEventListener('mousemove', handleSortableDragMove);
+        document.addEventListener('mouseup', finishSortableDrag);
     }
 
-    function handleRelationshipDragMove(event) {
+    function startRepeaterDrag(event, fieldKey, index) {
+        event.preventDefault();
+        state.drag = {
+            kind: 'repeater',
+            fieldKey: fieldKey,
+            index: index
+        };
+        state.dragOver = null;
+
+        var row = event.currentTarget.closest('.wordvel-repeater-sortable-item');
+
+        if (row) {
+            row.classList.add('is-dragging');
+        }
+
+        document.addEventListener('mousemove', handleSortableDragMove);
+        document.addEventListener('mouseup', finishSortableDrag);
+    }
+
+    function handleSortableDragMove(event) {
         if (!state.drag) {
             return;
         }
 
-        updateDragPreviewFromPoint(event.clientY, state.drag.fieldKey);
+        updateDragPreviewFromPoint(event.clientY, state.drag.fieldKey, state.drag.kind);
     }
 
-    function finishRelationshipDrag() {
-        document.removeEventListener('mousemove', handleRelationshipDragMove);
-        document.removeEventListener('mouseup', finishRelationshipDrag);
+    function finishSortableDrag() {
+        document.removeEventListener('mousemove', handleSortableDragMove);
+        document.removeEventListener('mouseup', finishSortableDrag);
 
         var drag = state.drag;
         var dragOver = state.dragOver;
 
         if (drag && dragOver) {
-            moveSelectedTo(drag.fieldKey, drag.ids || [], drag.index, dragOver.index, dragOver.position);
+            if (drag.kind === 'repeater') {
+                reorderRepeaterRows(drag.fieldKey, drag.index, dragOver.index, dragOver.position);
+            } else {
+                moveSelectedTo(drag.fieldKey, drag.ids || [], drag.index, dragOver.index, dragOver.position);
+            }
+
             return;
         }
 
@@ -1156,8 +1739,37 @@
         clearDragPreviewClasses(true);
     }
 
-    function updateDragPreviewFromPoint(clientY, fieldKey) {
-        var rows = Array.prototype.slice.call(root.querySelectorAll('[data-wordvel-relation-field="' + fieldKey + '"]'));
+    function reorderRepeaterRows(fieldKey, fromIndex, toIndex, position) {
+        var rows = Array.isArray(state.values[fieldKey]) ? state.values[fieldKey].slice() : [];
+
+        if (fromIndex === null || toIndex === null || fromIndex < 0 || toIndex < 0 || fromIndex >= rows.length) {
+            state.drag = null;
+            state.dragOver = null;
+            clearDragPreviewClasses(true);
+            render();
+            return;
+        }
+
+        var moved = rows.splice(fromIndex, 1)[0];
+        var insertIndex = position === 'after' ? toIndex + 1 : toIndex;
+
+        if (fromIndex < insertIndex) {
+            insertIndex -= 1;
+        }
+
+        rows.splice(Math.max(0, Math.min(insertIndex, rows.length)), 0, moved);
+        setValue(fieldKey, rows);
+        state.drag = null;
+        state.dragOver = null;
+        clearDragPreviewClasses(true);
+        render();
+    }
+
+    function updateDragPreviewFromPoint(clientY, fieldKey, kind) {
+        var selector = kind === 'repeater'
+            ? '[data-wordvel-repeater-field="' + fieldKey + '"]'
+            : '[data-wordvel-relation-field="' + fieldKey + '"]';
+        var rows = Array.prototype.slice.call(root.querySelectorAll(selector));
 
         if (!rows.length) {
             return;
@@ -1190,6 +1802,7 @@
 
         if (
             state.dragOver
+            && state.dragOver.kind === kind
             && state.dragOver.fieldKey === fieldKey
             && state.dragOver.index === index
             && state.dragOver.position === position
@@ -1197,7 +1810,7 @@
             return;
         }
 
-        state.dragOver = { fieldKey: fieldKey, index: index, position: position };
+        state.dragOver = { kind: kind, fieldKey: fieldKey, index: index, position: position };
         clearDragPreviewClasses(false);
         target.classList.add('drop-' + position);
     }
@@ -1226,7 +1839,7 @@
     }
 
     function clearDragPreviewClasses(includeDragging) {
-        root.querySelectorAll('.wordvel-resource-relation-row').forEach(function (row) {
+        root.querySelectorAll('.wordvel-resource-relation-row, .wordvel-repeater-sortable-item').forEach(function (row) {
             row.classList.remove('drop-before', 'drop-after');
 
             if (includeDragging) {
@@ -1273,7 +1886,10 @@
     }
 
     function fieldWrap(field, children) {
-        return element('div', { className: 'wordvel-resource-field' }, [
+        return element('div', {
+            className: 'wordvel-resource-field',
+            'data-wordvel-field-wrap': field.key
+        }, [
             element('div', { className: 'wordvel-resource-label' }, [field.label || field.key])
         ].concat(children));
     }
@@ -1373,9 +1989,157 @@
     }
 
     function editorId(field) {
-        var activeId = state.active && state.active.id ? state.active.id : 'new';
+        return 'wordvel-resource-editor-' + config.resourceKey + '-' + field.key;
+    }
 
-        return 'wordvel-resource-editor-' + config.resourceKey + '-' + activeId + '-' + field.key;
+    function refreshRecordForm() {
+        refreshActiveRecordInList();
+        refreshActiveTitle();
+        refreshActionButtons();
+
+        (config.schema.fields || []).forEach(function (field) {
+            if (field.type === 'media' || field.type === 'relationship' || field.type === 'repeater' || field.type === 'group') {
+                refreshField(field);
+                return;
+            }
+
+            refreshFieldControl(field);
+        });
+
+        initializeRichTextEditors();
+        restoreRelationshipFocus();
+    }
+
+    function refreshLocalizedControls() {
+        refreshActiveTitle();
+
+        (config.schema.fields || []).forEach(function (field) {
+            if (!isLocalizedField(field)) {
+                return;
+            }
+
+            var value = fieldValue(field) || '';
+
+            if (field.type === 'rich_text') {
+                refreshRichTextField(field, value);
+                return;
+            }
+
+            refreshFieldControl(field);
+        });
+    }
+
+    function refreshActiveTitle() {
+        var heading = root.querySelector('.wordvel-resource-form-header h2');
+
+        if (heading && state.active) {
+            heading.textContent = activeRecordTitle();
+        }
+    }
+
+    function refreshActiveRecordInList() {
+        root.querySelectorAll('[data-wordvel-record-id]').forEach(function (buttonNode) {
+            buttonNode.classList.toggle(
+                'is-active',
+                !!(state.active && String(buttonNode.getAttribute('data-wordvel-record-id')) === String(state.active.id))
+            );
+        });
+    }
+
+    function refreshActionButtons() {
+        var actions = root.querySelector('.wordvel-resource-actions');
+
+        if (!actions) {
+            return;
+        }
+
+        actions.replaceWith(element('div', { className: 'wordvel-resource-actions' }, [
+            button(state.isSaving ? 'Saving...' : 'Save ' + config.schema.label, 'primary', saveRecord, state.isSaving),
+            state.active ? button('Delete', 'secondary', deleteRecord, state.isSaving, true) : null
+        ]));
+    }
+
+    function refreshField(field) {
+        var existing = root.querySelector('[data-wordvel-field-wrap="' + field.key + '"]');
+
+        if (!existing) {
+            return;
+        }
+
+        var repeaterList = existing.querySelector('[data-wordvel-repeater-scroll="' + field.key + '"]');
+        var savedRepeaterScrollTop = repeaterList ? repeaterList.scrollTop : null;
+
+        preserveScroll(function () {
+            existing.replaceWith(renderField(field));
+
+            if (savedRepeaterScrollTop === null) {
+                return;
+            }
+
+            var restoreRepeaterScroll = function () {
+                var nextList = root.querySelector('[data-wordvel-repeater-scroll="' + field.key + '"]');
+
+                if (nextList) {
+                    nextList.scrollTop = savedRepeaterScrollTop;
+                }
+            };
+
+            restoreRepeaterScroll();
+            window.requestAnimationFrame(restoreRepeaterScroll);
+        });
+    }
+
+    function refreshFieldControl(field) {
+        var value = fieldValue(field);
+
+        if (field.type === 'rich_text') {
+            refreshRichTextField(field, value || '');
+            return;
+        }
+
+        var input = root.querySelector('[data-wordvel-field-key="' + field.key + '"]');
+
+        if (!input) {
+            return;
+        }
+
+        if (field.type === 'boolean') {
+            input.checked = !!value;
+            return;
+        }
+
+        var nextValue = value == null ? '' : String(value);
+
+        if (input.value !== nextValue) {
+            input.value = nextValue;
+        }
+    }
+
+    function refreshRichTextField(field, value) {
+        var id = editorId(field);
+        var textarea = document.getElementById(id);
+        var editor = window.tinymce && window.tinymce.get(id);
+        value = value || '';
+
+        if (editor && editor.getContent() !== value) {
+            editor.setContent(value);
+        }
+
+        if (textarea && textarea.value !== value) {
+            textarea.value = value;
+        }
+    }
+
+    function preserveScroll(callback) {
+        var scrollX = window.pageXOffset;
+        var scrollY = window.pageYOffset;
+
+        callback();
+
+        window.scrollTo(scrollX, scrollY);
+        window.requestAnimationFrame(function () {
+            window.scrollTo(scrollX, scrollY);
+        });
     }
 
     function initializeRichTextEditors() {
@@ -1390,12 +2154,20 @@
 
             var id = editorId(field);
 
-            if (!document.getElementById(id) || window.tinymce && window.tinymce.get(id)) {
+            if (!document.getElementById(id) || pendingRichTextEditors[id] || window.tinymce && window.tinymce.get(id)) {
                 return;
             }
 
+            pendingRichTextEditors[id] = true;
+
             window.setTimeout(function () {
                 try {
+                    delete pendingRichTextEditors[id];
+
+                    if (!document.getElementById(id) || window.tinymce && window.tinymce.get(id)) {
+                        return;
+                    }
+
                     window.wp.editor.initialize(id, {
                         tinymce: {
                             height: 180,
@@ -1406,9 +2178,30 @@
                         quicktags: true
                     });
                 } catch (error) {
+                    delete pendingRichTextEditors[id];
                     // Textarea fallback stays usable.
                 }
             }, 0);
+        });
+    }
+
+    function destroyRichTextEditors() {
+        if (!window.wp || !window.wp.editor || typeof window.wp.editor.remove !== 'function') {
+            return;
+        }
+
+        (config.schema.fields || []).forEach(function (field) {
+            if (field.type !== 'rich_text') {
+                return;
+            }
+
+            delete pendingRichTextEditors[editorId(field)];
+
+            try {
+                window.wp.editor.remove(editorId(field));
+            } catch (error) {
+                // The editor may not have been initialized yet.
+            }
         });
     }
 
@@ -1422,13 +2215,22 @@
                 return;
             }
 
+            var textarea = document.getElementById(editorId(field));
+            var wrapper = document.getElementById('wp-' + editorId(field) + '-wrap');
+            var isCodeMode = wrapper && wrapper.classList.contains('html-active');
             var editor = window.tinymce.get(editorId(field));
 
-            if (editor) {
-                setValue(field.key, editor.getContent());
+            if (isCodeMode && textarea) {
+                setFieldValue(field, textarea.value);
+            } else if (editor) {
+                setFieldValue(field, editor.getContent());
+            } else if (textarea) {
+                setFieldValue(field, textarea.value);
             }
         });
     }
+
+    window.addEventListener('popstate', restoreEditorFromUrl);
 
     loadAllRelationshipOptions().then(loadRecords);
 })();

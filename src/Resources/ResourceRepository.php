@@ -12,6 +12,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Wordvel\Data\FieldSchemaData;
 use Wordvel\Data\ResourceSchemaData;
+use Wordvel\Support\LocalizedValue;
+use Wordvel\Support\Timecode;
 use Wordvel\WordPress\MediaRepository;
 
 final class ResourceRepository
@@ -29,7 +31,7 @@ final class ResourceRepository
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function index(ResourceSchemaData $schema, ?string $search = null, bool $summary = false, bool $summaryPreview = false): array
+    public function index(ResourceSchemaData $schema, ?string $search = null, bool $summary = false, bool $summaryPreview = false, ?string $language = null): array
     {
         $model = $this->newModel($schema);
         $query = $model->newQuery();
@@ -72,7 +74,7 @@ final class ResourceRepository
         }
 
         return $records->take(200)
-            ->map(fn (Model $model): array => $summary ? $this->summaryPayload($schema, $model, $summaryPreview) : $this->recordPayload($schema, $model))
+            ->map(fn (Model $model): array => $summary ? $this->summaryPayload($schema, $model, $summaryPreview, $language) : $this->recordPayload($schema, $model, $language))
             ->values()
             ->all();
     }
@@ -80,29 +82,29 @@ final class ResourceRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function find(ResourceSchemaData $schema, int|string $id): ?array
+    public function find(ResourceSchemaData $schema, int|string $id, ?string $language = null): ?array
     {
         $model = $this->newModel($schema)->newQuery()->find($id);
 
-        return $model instanceof Model ? $this->recordPayload($schema, $model) : null;
+        return $model instanceof Model ? $this->recordPayload($schema, $model, $language) : null;
     }
 
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    public function store(ResourceSchemaData $schema, array $payload): array
+    public function store(ResourceSchemaData $schema, array $payload, ?string $language = null): array
     {
         $model = $this->newModel($schema);
 
-        return $this->persist($schema, $model, $payload);
+        return $this->persist($schema, $model, $payload, $language);
     }
 
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|null
      */
-    public function update(ResourceSchemaData $schema, int|string $id, array $payload): ?array
+    public function update(ResourceSchemaData $schema, int|string $id, array $payload, ?string $language = null): ?array
     {
         $model = $this->newModel($schema)->newQuery()->find($id);
 
@@ -110,7 +112,7 @@ final class ResourceRepository
             return null;
         }
 
-        return $this->persist($schema, $model, $payload);
+        return $this->persist($schema, $model, $payload, $language);
     }
 
     public function delete(ResourceSchemaData $schema, int|string $id): bool
@@ -123,7 +125,7 @@ final class ResourceRepository
     /**
      * @return array<int, array{id: string, label: string}>
      */
-    public function options(string $resourceKey, ?string $search = null, array $ids = []): array
+    public function options(string $resourceKey, ?string $search = null, array $ids = [], ?string $language = null): array
     {
         $schema = $this->registry->find($resourceKey);
 
@@ -141,19 +143,19 @@ final class ResourceRepository
                 ->whereKey($ids)
                 ->get()
                 ->sortBy(static fn (Model $model): int => array_search((int) $model->getKey(), $ids, true))
-                ->map(fn (Model $model): array => $this->summaryPayload($schema, $model))
+                ->map(fn (Model $model): array => $this->summaryPayload($schema, $model, language: $language))
                 ->values()
                 ->all();
         }
 
-        return $this->index($schema, $search, summary: true);
+        return $this->index($schema, $search, summary: true, language: $language);
     }
 
     /**
      * @param array<int, array<string, mixed>> $mediaItems
      * @return array<string, mixed>|null
      */
-    public function createRelatedFromMedia(ResourceSchemaData $schema, int|string $id, string $fieldKey, array $mediaItems): ?array
+    public function createRelatedFromMedia(ResourceSchemaData $schema, int|string $id, string $fieldKey, array $mediaItems, ?string $language = null): ?array
     {
         $parent = $this->newModel($schema)->newQuery()->find($id);
 
@@ -224,14 +226,14 @@ final class ResourceRepository
             $related->newQuery()->create($attributes);
         }
 
-        return $this->recordPayload($schema, $parent->refresh());
+        return $this->recordPayload($schema, $parent->refresh(), $language);
     }
 
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|null
      */
-    public function createRelated(ResourceSchemaData $schema, int|string $id, string $fieldKey, array $payload): ?array
+    public function createRelated(ResourceSchemaData $schema, int|string $id, string $fieldKey, array $payload, ?string $language = null): ?array
     {
         $parent = $this->newModel($schema)->newQuery()->find($id);
 
@@ -294,9 +296,9 @@ final class ResourceRepository
             }
         }
 
-        $this->persist($targetSchema, $child, $payload);
+        $this->persist($targetSchema, $child, $payload, $language);
 
-        return $this->recordPayload($schema, $parent->refresh());
+        return $this->recordPayload($schema, $parent->refresh(), $language);
     }
 
     /**
@@ -395,7 +397,7 @@ final class ResourceRepository
     private function searchScore(Model $model, array $fields, string $needle, array $tokens): int
     {
         $fieldValues = array_map(
-            fn (FieldSchemaData $field): string => $this->normalizeSearchText((string) $model->getAttribute($this->columnForField($field))),
+            fn (FieldSchemaData $field): string => $this->normalizeSearchText($this->fieldSearchText($model, $field)),
             $fields,
         );
         $combined = implode(' ', array_filter($fieldValues));
@@ -453,7 +455,7 @@ final class ResourceRepository
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    private function persist(ResourceSchemaData $schema, Model $model, array $payload): array
+    private function persist(ResourceSchemaData $schema, Model $model, array $payload, ?string $language = null): array
     {
         $afterSave = [];
 
@@ -462,10 +464,11 @@ final class ResourceRepository
 
             if ($field->type === 'slug' && ($value === null || $value === '')) {
                 $from = $field->options['from'] ?? null;
-                $value = is_string($from) ? Str::slug((string) Arr::get($payload, $from, '')) : '';
+                $source = is_string($from) ? Arr::get($payload, $from, '') : '';
+                $value = is_string($from) ? Str::slug(LocalizedValue::text($source, $language)) : '';
             }
 
-            $deferred = $this->assignField($model, $field, $value);
+            $deferred = $this->assignField($model, $field, $value, $language);
 
             if ($deferred !== null) {
                 $afterSave[] = $deferred;
@@ -478,10 +481,10 @@ final class ResourceRepository
             $callback($model);
         }
 
-        return $this->recordPayload($schema, $model->refresh());
+        return $this->recordPayload($schema, $model->refresh(), $language);
     }
 
-    private function assignField(Model $model, FieldSchemaData $field, mixed $value): ?callable
+    private function assignField(Model $model, FieldSchemaData $field, mixed $value, ?string $language = null): ?callable
     {
         if (($field->options['readonly'] ?? false) === true) {
             return null;
@@ -500,7 +503,7 @@ final class ResourceRepository
         $column = $this->columnForField($field);
 
         if ($field->type === 'number') {
-            $model->setAttribute($column, is_numeric($value) ? $value + 0 : null);
+            $model->setAttribute($column, $this->normalizedNumberValue($field, $value));
 
             return null;
         }
@@ -511,11 +514,75 @@ final class ResourceRepository
             return null;
         }
 
+        if ($field->type === 'repeater' || $field->type === 'group') {
+            $model->setAttribute($column, $this->structuredFieldValue($field, $value, $language));
+
+            return null;
+        }
+
         if ($field->type !== 'repeater' && $field->type !== 'group') {
+            if (($field->options['localized'] ?? false) === true) {
+                $value = LocalizedValue::normalize($value, $model->getAttribute($column), LocalizedValue::language($language));
+            }
+
             $model->setAttribute($column, $value);
         }
 
         return null;
+    }
+
+    private function structuredFieldValue(FieldSchemaData $field, mixed $value, ?string $language = null): mixed
+    {
+        if ($field->type === 'repeater') {
+            $rows = is_array($value) ? $value : [];
+
+            return array_values(array_map(
+                fn (mixed $row): array => $this->structuredRowValue($field->fields, is_array($row) ? $row : [], $language),
+                $rows,
+            ));
+        }
+
+        return $this->structuredRowValue($field->fields, is_array($value) ? $value : [], $language);
+    }
+
+    /**
+     * @param FieldSchemaData[] $fields
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function structuredRowValue(array $fields, array $row, ?string $language = null): array
+    {
+        $payload = [];
+
+        foreach ($fields as $childField) {
+            $value = $row[$childField->key] ?? null;
+
+            if ($childField->type === 'number') {
+                $payload[$childField->key] = $this->normalizedNumberValue($childField, $value);
+
+                continue;
+            }
+
+            if ($childField->type === 'boolean') {
+                $payload[$childField->key] = $value === true || $value === '1' || $value === 1;
+
+                continue;
+            }
+
+            if ($childField->type === 'repeater' || $childField->type === 'group') {
+                $payload[$childField->key] = $this->structuredFieldValue($childField, $value, $language);
+
+                continue;
+            }
+
+            if (($childField->options['localized'] ?? false) === true) {
+                $value = LocalizedValue::normalize($value, null, LocalizedValue::language($language));
+            }
+
+            $payload[$childField->key] = $value;
+        }
+
+        return $payload;
     }
 
     private function assignMediaField(Model $model, FieldSchemaData $field, mixed $value): void
@@ -630,11 +697,11 @@ final class ResourceRepository
     /**
      * @return array<string, mixed>
      */
-    private function recordPayload(ResourceSchemaData $schema, Model $model): array
+    private function recordPayload(ResourceSchemaData $schema, Model $model, ?string $language = null): array
     {
         return [
             'id' => (string) $model->getKey(),
-            'title' => $this->recordTitle($schema, $model),
+            'title' => $this->recordTitle($schema, $model, $language),
             'values' => collect($schema->fields)
                 ->mapWithKeys(fn (FieldSchemaData $field): array => [$field->key => $this->fieldValue($model, $field)])
                 ->all(),
@@ -644,9 +711,9 @@ final class ResourceRepository
     /**
      * @return array{id: string, label: string, title: string, preview?: array<string, mixed>|null}
      */
-    private function summaryPayload(ResourceSchemaData $schema, Model $model, bool $includePreview = false): array
+    private function summaryPayload(ResourceSchemaData $schema, Model $model, bool $includePreview = false, ?string $language = null): array
     {
-        $title = $this->recordTitle($schema, $model);
+        $title = $this->recordTitle($schema, $model, $language);
 
         $payload = [
             'id' => (string) $model->getKey(),
@@ -706,7 +773,103 @@ final class ResourceRepository
             return $this->relationshipValue($model, $field);
         }
 
-        return $model->getAttribute($this->columnForField($field));
+        $value = $model->getAttribute($this->columnForField($field));
+
+        if ($field->type === 'repeater' && is_array($value)) {
+            return $this->presentStructuredValue($field->fields, $value);
+        }
+
+        if ($field->type === 'group' && is_array($value)) {
+            return $this->presentStructuredRow($field->fields, $value);
+        }
+
+        if ($field->type === 'number') {
+            return $this->presentNumberValue($field, $value);
+        }
+
+        if (($field->options['localized'] ?? false) === true) {
+            return LocalizedValue::normalize($value);
+        }
+
+        return $value;
+    }
+
+    private function fieldFormat(FieldSchemaData $field): ?string
+    {
+        $format = $field->options['format'] ?? null;
+
+        return is_string($format) && $format !== '' ? $format : null;
+    }
+
+    private function normalizedNumberValue(FieldSchemaData $field, mixed $value): mixed
+    {
+        if ($this->fieldFormat($field) === 'timecode') {
+            return Timecode::parse($value);
+        }
+
+        return is_numeric($value) ? $value + 0 : null;
+    }
+
+    private function presentNumberValue(FieldSchemaData $field, mixed $value): mixed
+    {
+        if ($this->fieldFormat($field) === 'timecode' && is_numeric($value)) {
+            return Timecode::format((float) $value);
+        }
+
+        return is_numeric($value) ? $value + 0 : $value;
+    }
+
+    /**
+     * @param FieldSchemaData[] $fields
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function presentStructuredValue(array $fields, array $rows): array
+    {
+        return array_values(array_map(
+            fn (mixed $row): array => $this->presentStructuredRow($fields, is_array($row) ? $row : []),
+            $rows,
+        ));
+    }
+
+    /**
+     * @param FieldSchemaData[] $fields
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function presentStructuredRow(array $fields, array $row): array
+    {
+        $payload = [];
+
+        foreach ($fields as $childField) {
+            $value = $row[$childField->key] ?? null;
+
+            if ($childField->type === 'number') {
+                $payload[$childField->key] = $this->presentNumberValue($childField, $value);
+
+                continue;
+            }
+
+            if ($childField->type === 'repeater' && is_array($value)) {
+                $payload[$childField->key] = $this->presentStructuredValue($childField->fields, $value);
+
+                continue;
+            }
+
+            if ($childField->type === 'group' && is_array($value)) {
+                $payload[$childField->key] = $this->presentStructuredRow($childField->fields, $value);
+
+                continue;
+            }
+
+            if (($childField->options['localized'] ?? false) === true) {
+                $value = LocalizedValue::normalize($value);
+            }
+
+            $payload[$childField->key] = $value;
+        }
+
+        return $payload;
     }
 
     private function relationshipValue(Model $model, FieldSchemaData $field): mixed
@@ -809,15 +972,32 @@ final class ResourceRepository
         return $field->key;
     }
 
-    private function recordTitle(ResourceSchemaData $schema, Model $model): string
+    private function recordTitle(ResourceSchemaData $schema, Model $model, ?string $language = null): string
     {
         $titleField = $this->titleField($schema);
 
         if ($titleField !== null) {
-            return (string) $model->getAttribute($this->columnForField($titleField));
+            $value = $model->getAttribute($this->columnForField($titleField));
+
+            if (($titleField->options['localized'] ?? false) === true) {
+                return LocalizedValue::text($value, $language);
+            }
+
+            return (string) $value;
         }
 
         return '#' . (string) $model->getKey();
+    }
+
+    private function fieldSearchText(Model $model, FieldSchemaData $field): string
+    {
+        $value = $model->getAttribute($this->columnForField($field));
+
+        if (($field->options['localized'] ?? false) === true) {
+            return LocalizedValue::searchText($value);
+        }
+
+        return is_scalar($value) ? (string) $value : '';
     }
 
     /**
