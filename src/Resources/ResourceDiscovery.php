@@ -41,6 +41,7 @@ final class ResourceDiscovery
     private function paths(): array
     {
         $paths = config('wordvel.resources.paths', [
+            app_path('Http/Resources'),
             app_path('Data/Resources'),
         ]);
 

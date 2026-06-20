@@ -11,17 +11,23 @@ add_action('admin_menu', static function (): void {
     $groups = wordvel_resource_menu_groups($resources);
 
     foreach ($groups as $groupKey => $group) {
+        $primaryResource = wordvel_resource_group_primary_resource($group['resources']);
+        $primaryKey = is_array($primaryResource) ? (string) ($primaryResource['key'] ?? '') : '';
+        $menuSlug = $primaryKey !== '' ? 'wordvel-resource-' . $primaryKey : 'wordvel-resource-group-' . $groupKey;
+
         add_menu_page(
             (string) ($group['label'] ?? 'WordVel Resources'),
             (string) ($group['label'] ?? 'WordVel Resources'),
             'manage_options',
-            'wordvel-resource-group-' . $groupKey,
-            static fn () => wordvel_resource_group_page((string) $groupKey),
+            $menuSlug,
+            $primaryKey !== ''
+                ? static fn () => wordvel_resource_editor_page($primaryKey)
+                : static fn () => wordvel_resource_group_page((string) $groupKey),
             (string) ($group['icon'] ?? 'dashicons-database'),
             isset($group['position']) ? (int) $group['position'] : 59,
         );
 
-        foreach ($group['resources'] as $resource) {
+        foreach (wordvel_resource_group_menu_resources($group['resources'], $primaryKey) as $resource) {
             if (! is_array($resource)) {
                 continue;
             }
@@ -39,7 +45,7 @@ add_action('admin_menu', static function (): void {
             }
 
             add_submenu_page(
-                'wordvel-resource-group-' . $groupKey,
+                $menuSlug,
                 (string) ($resource['plural_label'] ?? ucfirst($key)),
                 (string) ($resource['plural_label'] ?? ucfirst($key)),
                 'manage_options',
@@ -107,6 +113,54 @@ function wordvel_resource_menu_groups(array $resources): array
     }
 
     return $groups;
+}
+
+function wordvel_resource_group_menu_resources(array $resources, string $primaryKey): array
+{
+    $menuResources = array_values($resources);
+
+    usort($menuResources, static function (array $left, array $right) use ($primaryKey): int {
+        $leftKey = (string) ($left['key'] ?? '');
+        $rightKey = (string) ($right['key'] ?? '');
+
+        if ($leftKey === $primaryKey) {
+            return -1;
+        }
+
+        if ($rightKey === $primaryKey) {
+            return 1;
+        }
+
+        $leftOptions = is_array($left['options'] ?? null) ? $left['options'] : [];
+        $rightOptions = is_array($right['options'] ?? null) ? $right['options'] : [];
+
+        return ((int) ($leftOptions['overview_order'] ?? 100)) <=> ((int) ($rightOptions['overview_order'] ?? 100));
+    });
+
+    return $menuResources;
+}
+
+function wordvel_resource_group_primary_resource(array $resources): ?array
+{
+    foreach ($resources as $resource) {
+        if (! is_array($resource)) {
+            continue;
+        }
+
+        $key = (string) ($resource['key'] ?? '');
+
+        if (str_ends_with($key, 'products')) {
+            return $resource;
+        }
+    }
+
+    foreach ($resources as $resource) {
+        if (is_array($resource)) {
+            return $resource;
+        }
+    }
+
+    return null;
 }
 
 function wordvel_resource_group_key(array $resource): string
@@ -254,11 +308,6 @@ function wordvel_resource_editor_page(string $resourceKey): void
         return;
     }
 
-    printf(
-        '<h1>%s</h1>',
-        esc_html((string) ($schema['plural_label'] ?? ucfirst($resourceKey))),
-    );
-    echo '<p class="description">Fields are inferred from Laravel Data DTOs and saved through the WordVel resource API.</p>';
     echo '<div id="wordvel-resource-editor-root" class="wordvel-resource-editor-root"></div>';
     echo '</div>';
 }

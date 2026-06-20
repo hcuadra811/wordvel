@@ -363,8 +363,7 @@ PHP;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', [\App\Http\Controllers\WordvelHealthController::class, 'show'])
-        ->name('wordvel.health')
-        ->responseDto(\App\Data\WordvelHealthResource::class);
+        ->name('wordvel.health');
 });
 PHP;
 

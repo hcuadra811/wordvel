@@ -588,12 +588,20 @@ final class ResourceRepository
     private function assignMediaField(Model $model, FieldSchemaData $field, mixed $value): void
     {
         $column = $this->columnForField($field);
+        $payloadColumn = $field->options['payload_column'] ?? null;
 
         if (($field->options['multiple'] ?? false) === true) {
             $model->setAttribute($column, array_values(array_filter(array_map(
                 fn (mixed $item): int => $this->mediaId($item),
                 is_array($value) ? $value : [],
             ))));
+
+            if (is_string($payloadColumn) && $payloadColumn !== '') {
+                $model->setAttribute($payloadColumn, array_values(array_filter(
+                    is_array($value) ? $value : [],
+                    static fn (mixed $item): bool => is_array($item) && is_numeric($item['id'] ?? null),
+                )));
+            }
 
             return;
         }
@@ -605,6 +613,10 @@ final class ResourceRepository
 
         if (is_string($urlColumn) && $urlColumn !== '') {
             $model->setAttribute($urlColumn, is_array($value) ? ($value['url'] ?? null) : null);
+        }
+
+        if (is_string($payloadColumn) && $payloadColumn !== '') {
+            $model->setAttribute($payloadColumn, is_array($value) && $mediaId > 0 ? $value : null);
         }
 
         $durationColumn = $field->options['duration_column'] ?? null;
@@ -643,7 +655,7 @@ final class ResourceRepository
             return null;
         }
 
-        return static function (Model $savedModel) use ($relationName, $ids): void {
+        return function (Model $savedModel) use ($field, $relationName, $ids): void {
             $relation = $savedModel->{$relationName}();
 
             if ($relation instanceof BelongsToMany) {
@@ -754,13 +766,31 @@ final class ResourceRepository
     private function fieldValue(Model $model, FieldSchemaData $field): mixed
     {
         if ($field->type === 'media') {
+            $payloadColumn = $field->options['payload_column'] ?? null;
+
             if (($field->options['multiple'] ?? false) === true) {
+                if (is_string($payloadColumn) && $payloadColumn !== '') {
+                    $payloads = $model->getAttribute($payloadColumn);
+
+                    if (is_array($payloads) && $payloads !== []) {
+                        return array_values(array_filter($payloads, static fn (mixed $item): bool => is_array($item)));
+                    }
+                }
+
                 $ids = $model->getAttribute($this->columnForField($field));
 
                 return array_values(array_filter(array_map(
                     fn (mixed $id): ?array => is_numeric($id) ? $this->mediaPayload((int) $id) : null,
                     is_array($ids) ? $ids : [],
                 )));
+            }
+
+            if (is_string($payloadColumn) && $payloadColumn !== '') {
+                $payload = $model->getAttribute($payloadColumn);
+
+                if (is_array($payload) && is_string($payload['url'] ?? null) && $payload['url'] !== '') {
+                    return $payload;
+                }
             }
 
             $id = $model->getAttribute($this->columnForField($field));
@@ -974,6 +1004,10 @@ final class ResourceRepository
 
     private function recordTitle(ResourceSchemaData $schema, Model $model, ?string $language = null): string
     {
+        if (method_exists($model, 'wordvelTitle')) {
+            return (string) $model->wordvelTitle($language);
+        }
+
         $titleField = $this->titleField($schema);
 
         if ($titleField !== null) {

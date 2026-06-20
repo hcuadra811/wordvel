@@ -67,13 +67,13 @@ final class ManifestCommand extends Command
                 'methods' => array_values(array_diff($route->methods(), ['HEAD'])),
                 'path' => $this->wordpressPath($route),
                 'laravel_uri' => '/' . ltrim($route->uri(), '/'),
+                'target_url' => $this->targetUrl($route),
                 'name' => $route->getName(),
                 'controller' => $controller,
                 'method' => $method,
                 'documented' => $endpoint !== null,
                 'docs' => $endpoint,
                 'request_dto' => $defaults['request_dto'] ?? null,
-                'response_dto' => $defaults['response_dto'] ?? null,
                 'capability' => $defaults['wp_capability'] ?? null,
             ];
         }
@@ -122,7 +122,35 @@ final class ManifestCommand extends Command
     {
         $defaults = $route->defaults;
 
-        return isset($defaults['request_dto']) || isset($defaults['response_dto']) || isset($defaults['wp_capability']);
+        if (($defaults['wordvel_bridge'] ?? null) === false) {
+            return false;
+        }
+
+        if (($defaults['wordvel_bridge'] ?? null) === true) {
+            return true;
+        }
+
+        if (config('wordvel.bridge.expose_api_routes', true) !== true) {
+            return false;
+        }
+
+        $uri = trim($route->uri(), '/');
+        $includePrefixes = $this->stringList(config('wordvel.bridge.include_prefixes', ['api']));
+        $excludePrefixes = $this->stringList(config('wordvel.bridge.exclude_prefixes', []));
+
+        foreach ($excludePrefixes as $prefix) {
+            if ($uri === $prefix || str_starts_with($uri, $prefix . '/')) {
+                return false;
+            }
+        }
+
+        foreach ($includePrefixes as $prefix) {
+            if ($uri === $prefix || str_starts_with($uri, $prefix . '/')) {
+                return true;
+            }
+        }
+
+        return isset($defaults['request_dto']) || isset($defaults['wp_capability']);
     }
 
     private function wordpressPath(Route $route): string
@@ -136,7 +164,27 @@ final class ManifestCommand extends Command
             }
         }
 
+        $uri = preg_replace('/\{([A-Za-z_][A-Za-z0-9_]*)(\\?)?\\}/', '(?P<$1>[^/]+)', $uri) ?: $uri;
+
         return '/' . trim($uri, '/');
+    }
+
+    private function targetUrl(Route $route): string
+    {
+        $base = rtrim((string) config('wordvel.bridge.api_base_url', config('app.url')), '/');
+
+        return $base . '/' . ltrim($route->uri(), '/');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function stringList(mixed $value): array
+    {
+        return array_values(array_filter(
+            array_map(static fn (mixed $item): string => trim((string) $item, '/'), is_array($value) ? $value : []),
+            static fn (string $item): bool => $item !== '',
+        ));
     }
 
     /**

@@ -21,7 +21,6 @@ final class Dispatcher
      *     controller: class-string,
      *     method: string,
      *     request_dto?: class-string|null,
-     *     response_dto?: class-string|null,
      *     wp_request: object
      * } $route
      */

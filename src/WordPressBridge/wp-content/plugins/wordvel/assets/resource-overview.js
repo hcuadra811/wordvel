@@ -46,7 +46,19 @@
 
     function render() {
         root.innerHTML = '';
-        root.appendChild(element('div', { className: 'wordvel-resource-overview-grid' }, config.resources.map(renderCard)));
+        root.appendChild(element('div', { className: 'wordvel-resource-overview-list' }, [
+            element('table', { className: 'wp-list-table widefat fixed striped table-view-list wordvel-resource-overview-table' }, [
+                element('thead', {}, [
+                    element('tr', {}, [
+                        element('th', { scope: 'col' }, ['Resource']),
+                        element('th', { scope: 'col' }, ['Records']),
+                        element('th', { scope: 'col' }, ['Latest']),
+                        element('th', { scope: 'col' }, ['Actions'])
+                    ])
+                ]),
+                element('tbody', {}, config.resources.map(renderRow))
+            ])
+        ]));
     }
 
     function latestFirst(records) {
@@ -62,66 +74,43 @@
         });
     }
 
-    function renderCard(resource) {
+    function renderRow(resource) {
         var records = state.records[resource.key] || [];
-        var activeIndex = Math.min(state.activeIndex[resource.key] || 0, Math.max(records.length - 1, 0));
-        var active = records[activeIndex] || null;
+        var active = records[0] || null;
         var preview = active && active.preview && active.preview.url ? active.preview : null;
 
-        return element('article', { className: 'wordvel-resource-overview-card' }, [
-            element('div', { className: 'wordvel-resource-overview-card-header' }, [
-                element('span', {}, [resource.label || 'Resource']),
-                element('strong', {}, [resource.plural_label || resource.key]),
-                element('small', {}, [state.isLoading ? 'Loading...' : records.length + ' total'])
-            ]),
-            element('a', {
-                className: 'wordvel-resource-overview-feature',
-                href: editorUrl(resource, active)
-            }, [
-                preview
-                    ? element('img', { src: preview.url, alt: preview.alt || preview.title || '' }, [])
-                    : element('div', { className: 'wordvel-resource-overview-placeholder' }, [
-                        element('span', { className: 'dashicons dashicons-format-image' }, [])
+        return element('tr', {}, [
+            element('td', { className: 'wordvel-resource-title column-primary' }, [
+                element('strong', {}, [
+                    element('a', { href: editorUrl(resource, null) }, [resource.plural_label || resource.key])
+                ]),
+                element('div', { className: 'row-actions' }, [
+                    element('span', { className: 'edit' }, [
+                        element('a', { href: editorUrl(resource, active) }, [active ? 'Edit latest' : 'Add new'])
                     ]),
-                element('span', {}, [
-                    element('strong', {}, [active ? (active.title || active.label || ('#' + active.id)) : 'No records yet']),
-                    element('small', {}, [active ? 'Open selected record' : 'Create the first record'])
+                    ' | ',
+                    element('span', { className: 'view' }, [
+                        element('a', { href: editorUrl(resource, null) }, ['View all'])
+                    ])
                 ])
             ]),
-            records.length > 1 ? element('div', { className: 'wordvel-resource-overview-controls' }, [
-                iconButton('dashicons-arrow-left-alt2', 'Previous', function () {
-                    move(resource.key, records.length, -1);
-                }),
-                element('span', {}, [(activeIndex + 1) + ' / ' + records.length]),
-                iconButton('dashicons-arrow-right-alt2', 'Next', function () {
-                    move(resource.key, records.length, 1);
-                })
-            ]) : null,
-            records.length > 1 ? element('div', { className: 'wordvel-resource-overview-strip' }, records.map(function (record, index) {
-                var itemPreview = record.preview && record.preview.url ? record.preview : null;
-
-                return element('button', {
-                    type: 'button',
-                    className: index === activeIndex ? 'is-active' : '',
-                    onclick: function () {
-                        state.activeIndex[resource.key] = index;
-                        render();
-                    }
+            element('td', {}, [state.isLoading ? 'Loading...' : String(records.length)]),
+            element('td', {}, [
+                element('a', {
+                    className: 'wordvel-resource-latest',
+                    href: editorUrl(resource, active)
                 }, [
-                    itemPreview ? element('img', { src: itemPreview.url, alt: '' }, []) : element('span', { className: 'dashicons dashicons-admin-generic' }, []),
-                    element('strong', {}, [record.title || record.label || ('#' + record.id)])
-                ]);
-            })) : null
+                    preview
+                        ? element('img', { src: preview.url, alt: preview.alt || preview.title || '' }, [])
+                        : element('span', { className: 'dashicons dashicons-admin-generic' }, []),
+                    element('span', {}, [active ? (active.title || active.label || ('#' + active.id)) : 'No records yet'])
+                ])
+            ]),
+            element('td', {}, [
+                element('a', { className: 'button button-small', href: editorUrl(resource, null) }, ['Add New']),
+                active ? element('a', { className: 'button button-small', href: editorUrl(resource, active) }, ['Edit']) : null
+            ])
         ]);
-    }
-
-    function move(resourceKey, length, direction) {
-        if (!length) {
-            return;
-        }
-
-        state.activeIndex[resourceKey] = ((state.activeIndex[resourceKey] || 0) + direction + length) % length;
-        render();
     }
 
     function editorUrl(resource, record) {
@@ -133,16 +122,6 @@
         }
 
         return String(config.adminUrl || 'admin.php') + '?' + params.toString();
-    }
-
-    function iconButton(icon, label, onClick) {
-        return element('button', {
-            type: 'button',
-            className: 'button button-small wordvel-icon-button',
-            title: label,
-            'aria-label': label,
-            onclick: onClick
-        }, [element('span', { className: 'dashicons ' + icon }, [])]);
     }
 
     function element(tag, attributes, children) {

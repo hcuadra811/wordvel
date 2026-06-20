@@ -7,5 +7,9 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/includes/legacy.php';
+require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/manifest.php';
+require_once __DIR__ . '/includes/editor.php';
+require_once __DIR__ . '/includes/site.php';
+require_once __DIR__ . '/includes/admin-regions.php';
 require_once __DIR__ . '/includes/resources.php';

@@ -183,7 +183,8 @@
         notice: null,
         language: readStoredLanguage(),
         isLoading: false,
-        isSaving: false
+        isSaving: false,
+        isCreating: new URLSearchParams(window.location.search).get('action') === 'new'
     };
 
     var loadRecordRequestId = 0;
@@ -275,6 +276,8 @@
 
         if (recordId) {
             params.set('record', String(recordId));
+        } else if (options && options.action === 'new') {
+            params.set('action', 'new');
         }
 
         if (state.language) {
@@ -304,6 +307,7 @@
 
     function restoreEditorFromUrl() {
         var recordId = readRecordIdFromUrl();
+        var isCreating = new URLSearchParams(window.location.search).get('action') === 'new';
 
         if (recordId) {
             if (!state.active || String(state.active.id) !== String(recordId)) {
@@ -313,8 +317,18 @@
             return;
         }
 
-        if (state.active) {
+        if (isCreating) {
             state.active = null;
+            state.isCreating = true;
+            state.values = emptyValues();
+            state.notice = null;
+            render();
+            return;
+        }
+
+        if (state.active || state.isCreating) {
+            state.active = null;
+            state.isCreating = false;
             state.values = emptyValues();
             state.notice = null;
             syncEditorUrl(null);
@@ -409,22 +423,25 @@
         state.optionLabels = {};
         state.relationSearch = {};
         syncEditorUrl(state.active && state.active.id ? state.active.id : null);
-        refreshLocalizedControls();
+        render();
         loadRecords({ silent: true });
     }
 
     function loadRecords(options) {
         var silent = !!(options && options.silent);
+        var preserveNotice = !!(options && options.preserveNotice);
 
         if (!silent) {
             state.isLoading = true;
             render();
         }
 
-        return request('/' + config.resourceKey + '?summary=1')
+        return request('/' + config.resourceKey)
             .then(function (records) {
                 state.records = Array.isArray(records) ? records : [];
-                state.notice = null;
+                if (!preserveNotice) {
+                    state.notice = null;
+                }
 
                 var recordId = readRecordIdFromUrl() || config.initialId;
 
@@ -432,14 +449,7 @@
                     return loadRecord(recordId);
                 }
 
-                if (!state.active && state.records[0]) {
-                    syncEditorUrl(state.records[0].id);
-                    return loadRecord(state.records[0].id);
-                }
-
-                if (!state.active) {
-                    syncEditorUrl(null);
-                }
+                state.isCreating = new URLSearchParams(window.location.search).get('action') === 'new';
 
                 if (state.active && state.active.id) {
                     var updatedActive = state.records.find(function (record) {
@@ -448,7 +458,9 @@
                     state.active = updatedActive || state.active;
                 }
 
-                state.notice = null;
+                if (!preserveNotice) {
+                    state.notice = null;
+                }
             })
             .catch(function (error) {
                 state.notice = { type: 'error', message: error.message };
@@ -472,6 +484,7 @@
                 }
 
                 state.active = record;
+                state.isCreating = false;
                 state.values = Object.assign({}, record.values || {});
                 state.notice = null;
                 syncEditorUrl(record.id);
@@ -728,9 +741,10 @@
 
     function newRecord() {
         state.active = null;
+        state.isCreating = true;
         state.values = emptyValues();
         state.notice = null;
-        syncEditorUrl(null);
+        syncEditorUrl(null, { push: true, action: 'new' });
         render();
     }
 
@@ -750,10 +764,11 @@
             .then(function (record) {
                 state.notice = { type: 'success', message: config.schema.label + ' saved.' };
                 state.active = record;
+                state.isCreating = false;
                 state.values = Object.assign({}, record.values || {});
                 syncEditorUrl(record.id);
 
-                return loadRecords();
+                return loadRecords({ silent: true, preserveNotice: true });
             })
             .catch(function (error) {
                 state.notice = { type: 'error', message: error.message };
@@ -777,6 +792,7 @@
         })
             .then(function () {
                 state.active = null;
+                state.isCreating = false;
                 state.values = emptyValues();
                 state.notice = { type: 'success', message: config.schema.label + ' deleted.' };
                 syncEditorUrl(null);
@@ -795,12 +811,9 @@
     function render() {
         destroyRichTextEditors();
         root.innerHTML = '';
-        root.appendChild(element('div', {}, [
-            element('div', { className: 'wordvel-resource-app' }, [
-                renderList(),
-                renderForm()
-            ]),
-            renderModal()
+        root.appendChild(element('div', { className: 'wordvel-resource-app' }, [
+            state.active || state.isCreating ? renderForm() : renderList(),
+            renderModal(),
         ]));
 
         initializeRichTextEditors();
@@ -808,43 +821,465 @@
     }
 
     function renderList() {
-        return element('aside', { className: 'wordvel-resource-list' }, [
-            element('div', { className: 'wordvel-resource-list-header' }, [
-                element('h2', {}, [config.schema.plural_label || config.schema.label]),
-                button('New', 'secondary', newRecord)
-            ]),
-            state.isLoading
-                ? element('p', { style: 'padding: 14px;' }, ['Loading...'])
-                : element('ul', { className: 'wordvel-resource-records' }, state.records.map(function (record) {
-                    return element('li', {}, [
-                        element('button', {
-                            type: 'button',
-                            className: state.active && state.active.id === record.id ? 'is-active' : '',
-                            'data-wordvel-record-id': record.id,
-                            onclick: function () {
-                                selectRecord(record);
-                            }
-                        }, [record.title || '#' + record.id])
-                    ]);
-                }))
-        ]);
-    }
+        var columns = resourceListColumns();
 
-    function renderForm() {
-        return element('section', { className: 'wordvel-resource-form' }, [
-            element('div', { className: 'wordvel-resource-form-header' }, [
-                element('h2', {}, [state.active ? activeRecordTitle() : 'New ' + config.schema.label]),
-                renderLanguageSwitcher()
-            ]),
+        return element('section', { className: 'wordvel-resource-list wordvel-resource-list-screen' }, [
+            element('h1', { className: 'wp-heading-inline' }, [config.schema.plural_label || config.schema.label]),
+            element('button', { type: 'button', className: 'page-title-action', onclick: newRecord }, ['Add New']),
+            renderLanguageSwitcher(),
+            element('hr', { className: 'wp-header-end' }, []),
             state.notice ? element('div', {
                 className: 'notice notice-' + (state.notice.type === 'error' ? 'error' : 'success') + ' wordvel-resource-notice'
             }, [element('p', {}, [state.notice.message])]) : null,
-            element('div', { className: 'wordvel-resource-actions' }, [
-                button(state.isSaving ? 'Saving...' : 'Save ' + config.schema.label, 'primary', saveRecord, state.isSaving),
-                state.active ? button('Delete', 'secondary', deleteRecord, state.isSaving, true) : null
+            element('ul', { className: 'subsubsub' }, [
+                element('li', {}, [
+                    element('a', { href: '#', className: 'current' }, [
+                        'All ',
+                        element('span', { className: 'count' }, ['(' + state.records.length + ')'])
+                    ])
+                ])
             ]),
-            element('div', { className: 'wordvel-resource-fields' }, (config.schema.fields || []).map(renderField))
+            element('div', { className: 'tablenav top wordvel-resource-list-nav' }, [
+                element('div', { className: 'alignleft actions bulkactions' }, [
+                    element('select', {}, [
+                        element('option', { value: '' }, ['Bulk actions']),
+                        element('option', { value: 'delete' }, ['Delete'])
+                    ]),
+                    element('button', { type: 'button', className: 'button action', disabled: 'disabled' }, ['Apply'])
+                ]),
+                element('div', { className: 'alignleft actions' }, resourceFilterControls()),
+                element('p', { className: 'search-box' }, [
+                    element('label', { className: 'screen-reader-text', for: 'wordvel-resource-search' }, ['Search']),
+                    element('input', { type: 'search', id: 'wordvel-resource-search' }),
+                    element('button', { type: 'button', className: 'button' }, ['Search ' + (config.schema.plural_label || 'items')])
+                ]),
+                element('div', { className: 'tablenav-pages one-page' }, [
+                    element('span', { className: 'displaying-num' }, [
+                        state.isLoading ? 'Loading...' : state.records.length + ' item' + (state.records.length === 1 ? '' : 's')
+                    ])
+                ])
+            ]),
+            state.isLoading
+                ? element('p', { style: 'padding: 14px;' }, ['Loading...'])
+                : element('table', { className: 'wp-list-table widefat fixed striped table-view-list wordvel-resource-records' }, [
+                    element('thead', {}, [
+                        element('tr', {}, columns.map(renderListHeader))
+                    ]),
+                    element('tbody', {}, state.records.length ? state.records.map(function (record) {
+                        var active = state.active && String(state.active.id) === String(record.id);
+
+                        return element('tr', { className: active ? 'is-active' : '' }, columns.map(function (column) {
+                                return renderListCell(column, record);
+                        }));
+                    }) : [
+                        element('tr', {}, [
+                            element('td', { colspan: String(columns.length) }, ['No records found.'])
+                        ])
+                    ])
+                ])
         ]);
+    }
+
+    function resourceListColumns() {
+        var fields = config.schema.fields || [];
+        var has = function (key) {
+            return fields.some(function (field) {
+                return field.key === key;
+            });
+        };
+
+        if (has('sku') && has('price_cents')) {
+            return [
+                { key: 'cb', label: '', className: 'check-column' },
+                { key: 'thumb', label: '', className: 'column-thumb' },
+                { key: 'title', label: 'Name', className: 'column-primary column-name' },
+                { key: 'sku', label: 'SKU' },
+                { key: 'stock_status', label: 'Stock' },
+                { key: 'price_cents', label: 'Price' },
+                { key: 'categories', label: 'Categories' },
+                { key: 'is_featured', label: 'Featured' },
+                { key: 'status', label: 'Status' }
+            ];
+        }
+
+        return [
+            { key: 'cb', label: '', className: 'check-column' },
+            { key: 'title', label: 'Title', className: 'column-primary column-name' },
+            { key: 'id', label: 'ID' }
+        ];
+    }
+
+    function renderListHeader(column) {
+        if (column.key === 'cb') {
+            return element('td', { className: 'manage-column column-cb check-column' }, [
+                element('input', { type: 'checkbox' }, [])
+            ]);
+        }
+
+        return element('th', { scope: 'col', className: 'manage-column ' + (column.className || '') }, [column.label]);
+    }
+
+    function renderListCell(column, record) {
+        if (column.key === 'cb') {
+            return element('th', { scope: 'row', className: 'check-column' }, [
+                element('input', { type: 'checkbox', value: record.id }, [])
+            ]);
+        }
+
+        if (column.key === 'thumb') {
+            var image = recordValue(record, 'featured_image') || recordValue(record, 'primary_image');
+            var gallery = recordValue(record, 'gallery');
+
+            if (!image && Array.isArray(gallery)) {
+                image = gallery[0];
+            }
+
+            return element('td', { className: 'thumb column-thumb' }, [
+                image && image.url
+                    ? element('img', { src: image.url, alt: image.alt || record.title || '' }, [])
+                    : element('span', { className: 'dashicons dashicons-format-image' }, [])
+            ]);
+        }
+
+        if (column.key === 'title') {
+            return element('td', { className: 'column-primary column-name' }, [
+                element('strong', {}, [
+                    element('button', {
+                        type: 'button',
+                        className: 'wordvel-link-button row-title',
+                        'data-wordvel-record-id': record.id,
+                        onclick: function () {
+                            selectRecord(record);
+                        }
+                    }, [record.title || '#' + record.id])
+                ]),
+                element('div', { className: 'row-actions' }, [
+                    element('span', { className: 'edit' }, [
+                        element('button', {
+                            type: 'button',
+                            className: 'wordvel-link-button',
+                            onclick: function () {
+                                selectRecord(record);
+                            }
+                        }, ['Edit'])
+                    ]),
+                    ' | ',
+                    element('span', { className: 'trash' }, [
+                        element('button', {
+                            type: 'button',
+                            className: 'wordvel-link-button submitdelete',
+                            onclick: function () {
+                                selectRecord(record);
+                                window.setTimeout(deleteRecord, 0);
+                            }
+                        }, ['Trash'])
+                    ])
+                ]),
+                element('button', { type: 'button', className: 'toggle-row' }, [
+                    element('span', { className: 'screen-reader-text' }, ['Show more details'])
+                ])
+            ]);
+        }
+
+        if (column.key === 'id') {
+            return element('td', {}, ['#' + record.id]);
+        }
+
+        return element('td', {}, [formatListValue(column.key, record)]);
+    }
+
+    function resourceFilterControls() {
+        if (!fieldByKey('categories') && !fieldByKey('stock_status')) {
+            return [];
+        }
+
+        var controls = [];
+
+        if (fieldByKey('categories')) {
+            controls.push(element('select', {}, [
+                element('option', { value: '' }, ['Select a category'])
+            ]));
+        }
+
+        if (fieldByKey('stock_status')) {
+            controls.push(element('select', {}, [
+                element('option', { value: '' }, ['Filter by stock status'])
+            ]));
+        }
+
+        controls.push(element('button', { type: 'button', className: 'button', disabled: 'disabled' }, ['Filter']));
+
+        return controls;
+    }
+
+    function formatListValue(key, record) {
+        var value = recordValue(record, key);
+
+        if (key === 'price_cents') {
+            return formatPrice(value, recordValue(record, 'currency') || 'NIO');
+        }
+
+        if (key === 'stock_status') {
+            return value === 'in_stock' ? 'In stock' : (value || '—');
+        }
+
+        if (key === 'is_featured') {
+            return value ? '★' : '☆';
+        }
+
+        if (key === 'categories') {
+            return relationshipListLabels(fieldByKey(key), value);
+        }
+
+        if (value == null || value === '') {
+            return '—';
+        }
+
+        return String(value);
+    }
+
+    function formatPrice(value, currency) {
+        var amount = Number(value || 0) / 100;
+        var symbol = currency === 'NIO' ? 'C$' : currency;
+
+        return symbol + ' ' + amount.toLocaleString('es-NI', { maximumFractionDigits: 0 });
+    }
+
+    function relationshipListLabels(field, value) {
+        var ids = Array.isArray(value) ? value.map(String) : (value ? [String(value)] : []);
+        var resource = field && field.options && field.options.resource;
+
+        if (!resource || !ids.length) {
+            return '—';
+        }
+
+        var labels = state.optionLabels[resource] || {};
+        var missing = ids.filter(function (id) {
+            return !labels[id];
+        });
+
+        if (missing.length) {
+            window.setTimeout(function () {
+                loadRelationshipOptions(field, missing).then(render);
+            }, 0);
+        }
+
+        return ids.map(function (id) {
+            return labels[id] || '#' + id;
+        }).join(', ');
+    }
+
+    function recordValue(record, key) {
+        return record && record.values ? record.values[key] : null;
+    }
+
+    function fieldByKey(key) {
+        return (config.schema.fields || []).find(function (field) {
+            return field.key === key;
+        });
+    }
+
+    function renderForm() {
+        var groups = editorFieldGroups();
+
+        return element('section', { className: 'wordvel-resource-form' }, [
+            element('h1', { className: 'wp-heading-inline' }, [state.active ? 'Edit ' + config.schema.label : 'Add New ' + config.schema.label]),
+            state.active ? element('button', { type: 'button', className: 'page-title-action', onclick: newRecord }, ['Add New']) : null,
+            renderLanguageSwitcher(),
+            element('hr', { className: 'wp-header-end' }, []),
+            state.notice ? element('div', {
+                className: 'notice notice-' + (state.notice.type === 'error' ? 'error' : 'success') + ' wordvel-resource-notice'
+            }, [element('p', {}, [state.notice.message])]) : null,
+            element('div', { id: 'poststuff', className: 'wordvel-poststuff' }, [
+                element('div', { id: 'post-body', className: 'metabox-holder columns-2' }, [
+                    element('div', { id: 'post-body-content' }, [
+                        groups.title ? renderTitleField(groups.title) : null,
+                        groups.slug ? element('div', { className: 'wordvel-slug-field' }, [renderField(groups.slug)]) : null,
+                        groups.description ? renderPostbox(groups.description.label || 'Description', [renderField(groups.description)], 'wordvel-description-box') : null,
+                        groups.productData.length ? renderPostbox('Product data', [
+                            element('div', { className: 'wordvel-product-data-fields' }, groups.productData.map(renderField))
+                        ], 'wordvel-product-data-box') : null,
+                        groups.attributes ? renderPostbox(groups.attributes.label || 'Attributes', [renderField(groups.attributes)], 'wordvel-attributes-box') : null,
+                        groups.shortDescription ? renderPostbox(groups.shortDescription.label || 'Short description', [renderField(groups.shortDescription)], 'wordvel-short-description-box') : null,
+                        groups.main.length ? renderPostbox('Details', [
+                            element('div', { className: 'wordvel-resource-fields' }, groups.main.map(renderField))
+                        ], 'wordvel-resource-main-box') : null
+                    ]),
+                    element('div', { id: 'postbox-container-1', className: 'postbox-container' }, [
+                        element('div', { id: 'side-sortables', className: 'meta-box-sortables ui-sortable' }, [
+                            renderPublishBox(groups.status),
+                            groups.featuredImage ? renderPostbox(groups.featuredImage.label || 'Featured image', [renderMediaField(groups.featuredImage, fieldValue(groups.featuredImage))], 'postimagediv') : null,
+                            groups.gallery ? renderPostbox(groups.gallery.label || 'Product gallery', [renderMediaField(groups.gallery, fieldValue(groups.gallery))], 'wordvel-gallery-box') : null,
+                            groups.categories ? renderPostbox(groups.categories.label || 'Categories', [renderRelationshipField(groups.categories, fieldValue(groups.categories))], 'categorydiv') : null,
+                        ].concat(groups.side.map(function (field) {
+                                return renderPostbox(field.label || field.key, [renderField(field)], 'wordvel-side-box');
+                            })))
+                    ])
+                ])
+            ]),
+        ]);
+    }
+
+    function renderPostbox(title, children, className) {
+        return element('div', { className: 'postbox ' + (className || '') }, [
+            element('div', { className: 'postbox-header' }, [
+                element('h2', {}, [title]),
+                element('div', { className: 'handle-actions hide-if-no-js' }, [
+                    element('button', { type: 'button', className: 'handlediv', 'aria-expanded': 'true' }, [
+                        element('span', { className: 'screen-reader-text' }, ['Toggle panel']),
+                        element('span', { className: 'toggle-indicator' }, [])
+                    ])
+                ])
+            ]),
+            element('div', { className: 'inside' }, children)
+        ]);
+    }
+
+    function renderPublishBox(statusField) {
+        return element('div', { id: 'submitdiv', className: 'postbox wordvel-submitbox' }, [
+            element('div', { className: 'postbox-header' }, [
+                element('h2', {}, ['Publish'])
+            ]),
+            element('div', { className: 'inside' }, [
+                element('div', { id: 'submitpost', className: 'submitbox' }, [
+                    element('div', { id: 'minor-publishing' }, [
+                        element('div', { id: 'minor-publishing-actions' }, [
+                            state.active ? element('div', { id: 'preview-action' }, [
+                                element('span', { className: 'wordvel-record-meta' }, ['ID: ' + state.active.id])
+                            ]) : null,
+                            element('div', { className: 'clear' }, [])
+                        ]),
+                        element('div', { id: 'misc-publishing-actions' }, [
+                            element('div', { className: 'misc-pub-section misc-pub-post-status' }, [
+                                element('span', { className: 'dashicons dashicons-admin-post' }, []),
+                                ' Status: ',
+                                statusField ? renderField(statusField) : element('strong', {}, [state.active ? 'Saved' : 'Draft'])
+                            ])
+                        ])
+                    ]),
+                    element('div', { id: 'major-publishing-actions' }, [
+                        state.active ? element('div', { id: 'delete-action' }, [
+                            element('button', {
+                                type: 'button',
+                                className: 'submitdelete deletion wordvel-link-button',
+                                onclick: deleteRecord,
+                                disabled: state.isSaving ? 'disabled' : null
+                            }, ['Move to Trash'])
+                        ]) : null,
+                        element('div', { id: 'publishing-action' }, [
+                            button(state.isSaving ? 'Saving...' : 'Save ' + config.schema.label, 'primary', saveRecord, state.isSaving)
+                        ]),
+                        element('div', { className: 'clear' }, [])
+                    ])
+                ])
+            ])
+        ]);
+    }
+
+    function renderTitleField(field) {
+        var value = fieldValue(field);
+
+        return element('div', { id: 'titlediv', className: 'wordvel-titlediv' }, [
+            element('div', { id: 'titlewrap' }, [
+                element('label', { className: 'screen-reader-text', for: 'title' }, [field.label || 'Title']),
+                element('input', {
+                    type: 'text',
+                    id: 'title',
+                    size: '30',
+                    value: value || '',
+                    placeholder: field.label || 'Title',
+                    'data-wordvel-field-key': field.key,
+                    oninput: function (event) {
+                        setFieldValue(field, event.target.value);
+                    }
+                })
+            ])
+        ]);
+    }
+
+    function editorFieldGroups() {
+        var fields = config.schema.fields || [];
+        var groups = {
+            title: null,
+            slug: null,
+            status: null,
+            description: null,
+            shortDescription: null,
+            productData: [],
+            attributes: null,
+            featuredImage: null,
+            gallery: null,
+            categories: null,
+            side: [],
+            main: []
+        };
+        var productDataKeys = ['sku', 'type', 'price_cents', 'compare_at_price_cents', 'currency', 'stock_quantity', 'stock_status', 'is_featured'];
+
+        fields.forEach(function (field) {
+            if (isTitleField(field)) {
+                groups.title = groups.title || field;
+                return;
+            }
+
+            if (field.type === 'slug' || field.key === 'slug') {
+                groups.slug = field;
+                return;
+            }
+
+            if (field.key === 'status') {
+                groups.status = field;
+                return;
+            }
+
+            if (field.key === 'description' || field.key === 'content') {
+                groups.description = field;
+                return;
+            }
+
+            if (field.key === 'short_description' || field.key === 'excerpt') {
+                groups.shortDescription = field;
+                return;
+            }
+
+            if (isFeaturedImageField(field)) {
+                groups.featuredImage = field;
+                return;
+            }
+
+            if (field.type === 'media' && (field.key === 'gallery' || field.key === 'product_gallery')) {
+                groups.gallery = field;
+                return;
+            }
+
+            if (field.type === 'relationship' && (field.key === 'categories' || field.key === 'category')) {
+                groups.categories = field;
+                return;
+            }
+
+            if (field.key === 'attribute_values' || field.key === 'attributes') {
+                groups.attributes = field;
+                return;
+            }
+
+            if (productDataKeys.indexOf(field.key) !== -1) {
+                groups.productData.push(field);
+                return;
+            }
+
+            groups.main.push(field);
+        });
+
+        return groups;
+    }
+
+    function isTitleField(field) {
+        var titleFieldKey = config.schema && config.schema.options && config.schema.options.title_field;
+
+        return field && (field.key === titleFieldKey || (!titleFieldKey && ['title', 'name'].indexOf(field.key) !== -1));
+    }
+
+    function isFeaturedImageField(field) {
+        return field && field.type === 'media' && ['featured_image', 'primary_image', 'post_image'].indexOf(field.key) !== -1;
     }
 
     function activeRecordTitle() {

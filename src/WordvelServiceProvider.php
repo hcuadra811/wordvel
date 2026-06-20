@@ -61,6 +61,18 @@ final class WordvelServiceProvider extends ServiceProvider
             return $this;
         });
 
+        Route::macro('wordvelBridge', function (): Route {
+            $this->defaults('wordvel_bridge', true);
+
+            return $this;
+        });
+
+        Route::macro('withoutWordvelBridge', function (): Route {
+            $this->defaults('wordvel_bridge', false);
+
+            return $this;
+        });
+
         Route::macro('wpCapability', function (string $capability): Route {
             $this->defaults('wp_capability', $capability);
 

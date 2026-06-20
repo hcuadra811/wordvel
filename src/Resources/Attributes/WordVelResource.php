@@ -14,7 +14,7 @@ final class WordVelResource
      * @param array<int, string> $searchFields
      */
     public function __construct(
-        public string $model,
+        public ?string $model = null,
         public ?string $key = null,
         public ?string $label = null,
         public ?string $pluralLabel = null,
@@ -32,5 +32,7 @@ final class WordVelResource
         public bool $routable = true,
         public ?string $slugPrefix = null,
         public ?string $slugField = 'slug',
+        public bool $includeId = false,
+        public bool $includeTimestamps = false,
     ) {}
 }

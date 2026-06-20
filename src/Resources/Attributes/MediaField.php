@@ -16,6 +16,7 @@ final class MediaField extends Field
         bool $multiple = false,
         ?string $column = null,
         ?string $urlColumn = null,
+        ?string $payloadColumn = null,
         ?string $durationColumn = null,
     ) {
         parent::__construct('media', $label, $required, array_filter([
@@ -23,6 +24,7 @@ final class MediaField extends Field
             'multiple' => $multiple,
             'column' => $column,
             'url_column' => $urlColumn,
+            'payload_column' => $payloadColumn,
             'duration_column' => $durationColumn,
         ], static fn (mixed $value): bool => $value !== null && $value !== false));
     }

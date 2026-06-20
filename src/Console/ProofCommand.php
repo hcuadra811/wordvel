@@ -29,7 +29,6 @@ final class ProofCommand extends Command
             'controller' => $controller,
             'method' => 'show',
             'request_dto' => $requestDto,
-            'response_dto' => null,
             'wp_request' => new FakeWpRestRequest(query: [
                 'name' => $this->argument('name'),
             ]),
