@@ -815,6 +815,19 @@
         });
     }
 
+    // Resource API calls go through the WordPress proxy via apiFetch, which
+    // adds the REST root and nonce. Resolves with the Response for any status.
+    function wordvelResourceFetch(options) {
+        return window.wp.apiFetch(Object.assign({}, options, { parse: false })).catch(function (error) {
+            // With parse: false, apiFetch rejects non-2xx responses with the Response itself.
+            if (error && typeof error.json === 'function') {
+                return error;
+            }
+
+            throw error;
+        });
+    }
+
     function wordvelFlattenFields(fields) {
         return fields.reduce(function (all, field) {
             return all.concat([field], wordvelFlattenFields(field.fields || []));
@@ -1400,12 +1413,12 @@
             : (props.value ? [String(props.value)] : []);
 
         useEffect(function () {
-            if (!resource || !window.wordvelResourceApiUrl || !isOpen) {
+            if (!resource || !window.wordvelResourceApiPath || !isOpen) {
                 return;
             }
 
             var alive = true;
-            var url = window.wordvelResourceApiUrl + '/' + encodeURIComponent(resource) + '/options';
+            var url = window.wordvelResourceApiPath + '/' + encodeURIComponent(resource) + '/options';
             var query = new URLSearchParams();
 
             if (search) {
@@ -1413,9 +1426,9 @@
             }
 
             setLoading(true);
-            window.fetch(url + (query.toString() ? '?' + query.toString() : ''), {
-                headers: { Accept: 'application/json', 'X-WP-Nonce': window.wordvelRestNonce },
-                credentials: 'same-origin'
+            wordvelResourceFetch({
+                path: url + (query.toString() ? '?' + query.toString() : ''),
+                headers: { Accept: 'application/json' }
             }).then(function (response) {
                 if (!response.ok) {
                     throw new Error('Could not load ' + resource);
@@ -1444,7 +1457,7 @@
         }, [resource, search, isOpen]);
 
         useEffect(function () {
-            if (!resource || !window.wordvelResourceApiUrl || selectedIds.length === 0) {
+            if (!resource || !window.wordvelResourceApiPath || selectedIds.length === 0) {
                 return;
             }
 
@@ -1457,15 +1470,15 @@
             }
 
             var alive = true;
-            var url = window.wordvelResourceApiUrl + '/' + encodeURIComponent(resource) + '/options';
+            var url = window.wordvelResourceApiPath + '/' + encodeURIComponent(resource) + '/options';
             var query = new URLSearchParams();
             missingIds.forEach(function (id) {
                 query.append('ids[]', id);
             });
 
-            window.fetch(url + '?' + query.toString(), {
-                headers: { Accept: 'application/json', 'X-WP-Nonce': window.wordvelRestNonce },
-                credentials: 'same-origin'
+            wordvelResourceFetch({
+                path: url + '?' + query.toString(),
+                headers: { Accept: 'application/json' }
             }).then(function (response) {
                 if (!response.ok) {
                     throw new Error('Could not load selected ' + resource);
@@ -1536,18 +1549,17 @@
         };
 
         var createRelated = function () {
-            if (!modal || !resource || !window.wordvelResourceApiUrl) {
+            if (!modal || !resource || !window.wordvelResourceApiPath) {
                 return;
             }
 
-            window.fetch(window.wordvelResourceApiUrl + '/' + encodeURIComponent(resource), {
+            wordvelResourceFetch({
+                path: window.wordvelResourceApiPath + '/' + encodeURIComponent(resource),
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': window.wordvelRestNonce
+                    'Content-Type': 'application/json'
                 },
-                credentials: 'same-origin',
                 body: JSON.stringify({ values: modal.values || {} })
             }).then(function (response) {
                 if (!response.ok) {

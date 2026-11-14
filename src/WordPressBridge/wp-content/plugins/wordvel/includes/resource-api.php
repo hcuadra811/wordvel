@@ -23,16 +23,17 @@ add_action('rest_api_init', static function (): void {
 });
 
 /**
- * The browser-facing URL of the resource API, or '' when the manifest has no
- * Laravel resource API to forward to.
+ * The REST path editor scripts pass to wp.apiFetch, or '' when the manifest
+ * has no Laravel resource API to forward to. apiFetch adds the site's REST
+ * root and the nonce, and refreshes the nonce when it expires.
  */
-function wordvel_resource_api_url(): string
+function wordvel_resource_api_path(): string
 {
     if (wordvel_resource_api_target() === '') {
         return '';
     }
 
-    return untrailingslashit(rest_url(WORDVEL_RESOURCE_API_NAMESPACE . '/resources'));
+    return '/' . WORDVEL_RESOURCE_API_NAMESPACE . '/resources';
 }
 
 function wordvel_resource_api_target(): string
@@ -45,9 +46,10 @@ function wordvel_resource_api_target(): string
 }
 
 /**
- * Relationship pickers in the block editor only look up options, so anyone who
- * can edit posts may do that. Every other resource request needs the same
- * capability as the resource admin screens.
+ * Relationship pickers in the block editor look up options for the resources
+ * that block fields reference, so anyone who can edit posts may do that for
+ * those resources. Every other resource request needs the same capability as
+ * the resource admin screens.
  */
 function wordvel_resource_api_permission(WP_REST_Request $request): bool
 {
@@ -58,11 +60,50 @@ function wordvel_resource_api_permission(WP_REST_Request $request): bool
         && is_array($segments)
         && count($segments) === 2
         && $segments[1] === 'options'
+        && in_array($segments[0], wordvel_block_relationship_resources(), true)
     ) {
         return current_user_can('edit_posts');
     }
 
     return current_user_can('manage_options');
+}
+
+/**
+ * Resource keys referenced by relationship fields of manifest blocks,
+ * including fields nested inside repeaters.
+ *
+ * @return array<int, string>
+ */
+function wordvel_block_relationship_resources(): array
+{
+    $manifest = wordvel_manifest();
+    $blocks = is_array($manifest) && is_array($manifest['blocks'] ?? null) ? $manifest['blocks'] : [];
+    $resources = [];
+    $collect = static function (array $fields) use (&$collect, &$resources): void {
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $resource = $field['options']['resource'] ?? null;
+
+            if (($field['type'] ?? null) === 'relationship' && is_string($resource) && $resource !== '') {
+                $resources[$resource] = true;
+            }
+
+            if (is_array($field['fields'] ?? null)) {
+                $collect($field['fields']);
+            }
+        }
+    };
+
+    foreach ($blocks as $block) {
+        if (is_array($block) && is_array($block['fields'] ?? null)) {
+            $collect($block['fields']);
+        }
+    }
+
+    return array_keys($resources);
 }
 
 function wordvel_proxy_resource_request(WP_REST_Request $request): WP_REST_Response
@@ -87,15 +128,18 @@ function wordvel_proxy_resource_request(WP_REST_Request $request): WP_REST_Respo
 
     $url = $target . implode('', array_map(static fn (string $segment): string => '/' . rawurlencode($segment), $segments));
     $query = $request->get_query_params();
-    unset($query['rest_route']);
+    // WordPress routing and apiFetch parameters, not part of the resource API.
+    unset($query['rest_route'], $query['_locale'], $query['_method']);
 
     if ($query !== []) {
         $url .= '?' . http_build_query($query);
     }
 
-    $headers = [];
+    // Always ask Laravel for JSON: an HTML error page, such as Laravel's debug
+    // page, would echo the request headers, bridge key included.
+    $headers = ['accept' => 'application/json'];
 
-    foreach (['accept', 'accept-language', 'content-type', 'x-wordvel-language'] as $name) {
+    foreach (['accept-language', 'content-type', 'x-wordvel-language'] as $name) {
         $value = $request->get_header($name);
 
         if (is_string($value) && $value !== '') {
@@ -105,7 +149,7 @@ function wordvel_proxy_resource_request(WP_REST_Request $request): WP_REST_Respo
 
     $headers[strtolower(\Wordvel\Bridge\BridgeKey::HEADER)] = $key;
 
-    return wordvel_forward_request($request, $url, $headers);
+    return wordvel_forward_request($request, $url, $headers, true);
 }
 
 /**

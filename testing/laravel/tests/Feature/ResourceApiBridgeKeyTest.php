@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 use Wordvel\Bridge\BridgeKey;
+use Wordvel\Http\Controllers\ResourceController;
 use Wordvel\Http\Middleware\VerifyBridgeKey;
 
 final class ResourceApiBridgeKeyTest extends TestCase
@@ -82,5 +85,33 @@ final class ResourceApiBridgeKeyTest extends TestCase
     public function test_apps_can_attach_the_middleware_by_alias(): void
     {
         $this->assertSame(VerifyBridgeKey::class, app('router')->getMiddleware()['wordvel.bridge'] ?? null);
+    }
+
+    public function test_routes_that_require_the_bridge_key_stay_out_of_the_public_manifest_routes(): void
+    {
+        Route::middleware(['api', 'wordvel.bridge'])->get('api/bridge-only', [ResourceController::class, 'schemas']);
+        Route::middleware(['api', 'wordvel.bridge'])->get('api/bridge-opted-in', [ResourceController::class, 'schemas'])->wordvelBridge();
+        Route::middleware('api')->get('api/bridge-open', [ResourceController::class, 'schemas']);
+
+        // wordvel:manifest always writes the app's real manifest, so put it back afterwards.
+        $path = base_path('storage/wordvel/manifest.json');
+        $original = File::exists($path) ? File::get($path) : null;
+
+        try {
+            Artisan::call('wordvel:manifest');
+            $manifest = json_decode(File::get($path), true);
+        } finally {
+            $original === null ? File::delete($path) : File::put($path, $original);
+        }
+
+        $uris = array_column($manifest['routes'], 'laravel_uri');
+
+        $this->assertContains('/api/bridge-open', $uris);
+        $this->assertNotContains('/api/bridge-only', $uris);
+        $this->assertNotContains('/api/bridge-opted-in', $uris);
+
+        foreach ($uris as $uri) {
+            $this->assertStringStartsNotWith('/api/wordvel/resources', $uri);
+        }
     }
 }

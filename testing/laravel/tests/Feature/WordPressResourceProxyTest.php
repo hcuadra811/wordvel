@@ -94,7 +94,7 @@ final class WordPressResourceProxyTest extends TestCase
     {
         $GLOBALS['wordvel_wp_stub']['manifest'] = null;
 
-        $this->assertSame('', wordvel_resource_api_url());
+        $this->assertSame('', wordvel_resource_api_path());
         $this->assertSame(502, wordvel_proxy_resource_request(new WP_REST_Request('GET'))->get_status());
         $this->assertSame([], $GLOBALS['wordvel_wp_stub']['remote_requests']);
     }
@@ -107,25 +107,86 @@ final class WordPressResourceProxyTest extends TestCase
         $this->assertSame([], $GLOBALS['wordvel_wp_stub']['remote_requests']);
     }
 
-    public function test_browsers_get_the_wordpress_proxy_url(): void
+    public function test_scripts_get_the_proxy_path_for_api_fetch(): void
     {
-        $this->assertSame('http://wordvel-wp.test/wp-json/wordvel-editor/v1/resources', wordvel_resource_api_url());
+        $this->assertSame('/wordvel-editor/v1/resources', wordvel_resource_api_path());
+
+        $GLOBALS['wordvel_wp_stub']['manifest'] = null;
+
+        $this->assertSame('', wordvel_resource_api_path());
     }
 
-    public function test_option_lookups_need_edit_posts_and_everything_else_needs_manage_options(): void
+    public function test_it_always_asks_laravel_for_json(): void
     {
+        wordvel_proxy_resource_request(new WP_REST_Request('GET', ['Accept' => 'text/html'], [], ['path' => 'orders']));
+
+        $this->assertSame('application/json', $GLOBALS['wordvel_wp_stub']['remote_requests'][0]['args']['headers']['accept']);
+    }
+
+    public function test_it_never_relays_a_body_that_is_not_json(): void
+    {
+        $GLOBALS['wordvel_wp_stub']['remote_response'] = [
+            'code' => 500,
+            'body' => '<html>Whoops! x-wordvel-bridge-key: ' . BridgeKey::value() . '</html>',
+        ];
+
+        $response = wordvel_proxy_resource_request(new WP_REST_Request('GET', [], ['ids' => 'abc'], ['path' => 'orders/options']));
+
+        $this->assertSame(500, $response->get_status());
+        $this->assertStringNotContainsString(BridgeKey::value(), (string) json_encode($response->get_data()));
+        $this->assertSame(false, $response->get_data()['status']);
+
+        $GLOBALS['wordvel_wp_stub']['remote_response'] = ['code' => 200, 'body' => 'plain text'];
+
+        $this->assertSame(502, wordvel_proxy_resource_request(new WP_REST_Request('GET'))->get_status());
+    }
+
+    public function test_it_drops_wordpress_and_api_fetch_query_params(): void
+    {
+        wordvel_proxy_resource_request(new WP_REST_Request(
+            'POST',
+            [],
+            ['_locale' => 'user', '_method' => 'PUT', 'rest_route' => '/wordvel-editor/v1/resources/orders', 'lang' => 'en'],
+            ['path' => 'orders'],
+        ));
+
+        $this->assertSame('http://wordvel-api.test/api/wordvel/resources/orders?lang=en', $GLOBALS['wordvel_wp_stub']['remote_requests'][0]['url']);
+    }
+
+    public function test_option_lookups_for_block_relationships_need_edit_posts_and_everything_else_needs_manage_options(): void
+    {
+        $GLOBALS['wordvel_wp_stub']['manifest']['blocks'] = [
+            [
+                'key' => 'featured',
+                'fields' => [
+                    ['key' => 'title', 'type' => 'text', 'options' => []],
+                    [
+                        'key' => 'items',
+                        'type' => 'repeater',
+                        'options' => [],
+                        'fields' => [
+                            ['key' => 'product', 'type' => 'relationship', 'options' => ['resource' => 'products']],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
         $options = new WP_REST_Request('GET', [], [], ['path' => 'products/options']);
+        $unreferencedOptions = new WP_REST_Request('GET', [], [], ['path' => 'orders/options']);
         $index = new WP_REST_Request('GET', [], [], ['path' => 'orders']);
         $schemas = new WP_REST_Request('GET');
         $create = new WP_REST_Request('POST', [], [], ['path' => 'products']);
         $postOptions = new WP_REST_Request('POST', [], [], ['path' => 'products/options']);
 
+        $this->assertSame(['products'], wordvel_block_relationship_resources());
         $this->assertFalse(wordvel_resource_api_permission($options));
         $this->assertFalse(wordvel_resource_api_permission($index));
 
         $GLOBALS['wordvel_wp_stub']['capabilities'] = ['edit_posts'];
 
         $this->assertTrue(wordvel_resource_api_permission($options));
+        $this->assertFalse(wordvel_resource_api_permission($unreferencedOptions));
         $this->assertFalse(wordvel_resource_api_permission($index));
         $this->assertFalse(wordvel_resource_api_permission($schemas));
         $this->assertFalse(wordvel_resource_api_permission($create));
@@ -133,6 +194,7 @@ final class WordPressResourceProxyTest extends TestCase
 
         $GLOBALS['wordvel_wp_stub']['capabilities'] = ['edit_posts', 'manage_options'];
 
+        $this->assertTrue(wordvel_resource_api_permission($unreferencedOptions));
         $this->assertTrue(wordvel_resource_api_permission($index));
         $this->assertTrue(wordvel_resource_api_permission($schemas));
         $this->assertTrue(wordvel_resource_api_permission($create));

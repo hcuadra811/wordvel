@@ -111,22 +111,24 @@ Route::get('/custom-public-feed', Controller::class)
 The resource CRUD routes under `/api/wordvel/resources` only accept requests from the WordPress bridge. Browsers never call them directly:
 
 ```txt
-Editor script -> /wp-json/wordvel-editor/v1/resources/... (WordPress login cookie + X-WP-Nonce)
-WordPress     -> /api/wordvel/resources/...               (X-Wordvel-Bridge-Key)
+Editor script -> wp.apiFetch('/wordvel-editor/v1/resources/...')  (WordPress login cookie + REST nonce)
+WordPress     -> /api/wordvel/resources/...                        (X-Wordvel-Bridge-Key)
 ```
+
+The editor scripts use `wp.apiFetch`, so the REST root works with any permalink setting and an expired nonce is refreshed and the request retried.
 
 WordPress checks the user before forwarding:
 
-- `GET {resource}/options`, which block editor relationship pickers use, needs `edit_posts`;
+- `GET {resource}/options` for a resource that a block relationship field references needs `edit_posts`, so block editor relationship pickers work for editors;
 - every other resource request needs `manage_options`, the same capability as the resource admin screens.
 
-WordPress then forwards the request to the manifest's `editor.resource_api_url` with an `X-Wordvel-Bridge-Key` header. Laravel's `Wordvel\Http\Middleware\VerifyBridgeKey` runs on every resource route, after `config('wordvel.resources.middleware')`, and answers `401` unless the header matches.
+WordPress then forwards the request to the manifest's `editor.resource_api_url` with an `X-Wordvel-Bridge-Key` header. It always asks Laravel for JSON and never relays a response body that is not JSON, so an HTML error page that echoes request headers never reaches the browser. Laravel's `Wordvel\Http\Middleware\VerifyBridgeKey` runs on every resource route, after `config('wordvel.resources.middleware')`, and answers `401` unless the header matches.
 
-The key is `WORDVEL_BRIDGE_KEY` when set, and otherwise an HMAC derived from `APP_KEY`. WordPress boots the same Laravel application, so both sides resolve the same key with no extra setup. Set `WORDVEL_BRIDGE_KEY` only to rotate the key separately from `APP_KEY`. With neither set, every request is refused.
+The key is `config('wordvel.bridge.key')` (`WORDVEL_BRIDGE_KEY`) when set, and otherwise an HMAC derived from `APP_KEY`. WordPress boots the same Laravel application, so both sides resolve the same key with no extra setup. With neither set, every request is refused. A published `config/wordvel.php` replaces the whole `bridge` array, so it needs the `'key' => env('WORDVEL_BRIDGE_KEY')` entry for `WORDVEL_BRIDGE_KEY` to take effect.
 
-Apps can put the same check on their own WordPress-only routes with the `wordvel.bridge` middleware alias.
+The resource API is forwarded server-side to `config('wordvel.bridge.api_base_url')`, like other bridge routes, so that URL must be reachable from the WordPress host.
 
-The resource API is forwarded to `config('wordvel.bridge.api_base_url')`, like other bridge routes.
+Routes that require the bridge key are never exported as public WordPress REST routes in the manifest. Apps can require the key on their own server-to-server routes with the `wordvel.bridge` middleware alias. The caller has to send the key itself, which means setting `WORDVEL_BRIDGE_KEY` explicitly and sharing it with that caller.
 
 ## Resource CoC
 

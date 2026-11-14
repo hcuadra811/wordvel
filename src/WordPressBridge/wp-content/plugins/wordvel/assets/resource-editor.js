@@ -1,7 +1,7 @@
 (function bootWordVelResourceEditor() {
     var config = window.wordvelResourceEditor;
 
-    if (!config || !config.schema || !config.apiBaseUrl) {
+    if (!config || !config.schema || !config.apiPath || !window.wp || !window.wp.apiFetch) {
         return;
     }
 
@@ -198,15 +198,22 @@
     });
 
     function request(path, options) {
-        return window.fetch(config.apiBaseUrl + pathWithLanguage(path), Object.assign({
+        return window.wp.apiFetch(Object.assign({
+            path: config.apiPath + pathWithLanguage(path),
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
-                'X-Wordvel-Language': state.language,
-                'X-WP-Nonce': config.nonce
+                'X-Wordvel-Language': state.language
             },
-            credentials: 'same-origin'
-        }, options || {})).then(function (response) {
+            parse: false
+        }, options || {})).catch(function (error) {
+            // With parse: false, apiFetch rejects non-2xx responses with the Response itself.
+            if (error && typeof error.json === 'function') {
+                return error;
+            }
+
+            throw error;
+        }).then(function (response) {
             return response.json().then(function (json) {
                 if (!response.ok || json.status === false) {
                     throw new Error((json.error && json.error.message) || json.message || 'WordVel request failed.');

@@ -18,6 +18,7 @@ use Wordvel\Data\BlockSchemaData;
 use Wordvel\Data\FieldSchemaData;
 use Wordvel\Data\ThemeOptionGroupSchemaData;
 use Wordvel\Data\ThemeOptionsSchemaData;
+use Wordvel\Http\Middleware\VerifyBridgeKey;
 use Wordvel\Regions\RegionSchema;
 use Wordvel\Resources\ResourceRegistry;
 use Wordvel\ThemeOptions\Attributes\AsThemeOptions;
@@ -122,6 +123,12 @@ final class ManifestCommand extends Command
     {
         $defaults = $route->defaults;
 
+        // Routes that require the bridge key are for WordPress itself, never
+        // public WordPress REST routes.
+        if ($this->requiresBridgeKey($route)) {
+            return false;
+        }
+
         if (($defaults['wordvel_bridge'] ?? null) === false) {
             return false;
         }
@@ -169,7 +176,15 @@ final class ManifestCommand extends Command
         return '/' . trim($uri, '/');
     }
 
-    private function targetUrl(Route $route): string
+    private function requiresBridgeKey(Route $route): bool
+    {
+        $middleware = $route->gatherMiddleware();
+
+        return in_array(VerifyBridgeKey::class, $middleware, true)
+            || in_array('wordvel.bridge', $middleware, true);
+    }
+
+        private function targetUrl(Route $route): string
     {
         return $this->apiBaseUrl() . '/' . ltrim($route->uri(), '/');
     }

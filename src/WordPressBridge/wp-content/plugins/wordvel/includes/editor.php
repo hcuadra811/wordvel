@@ -9,7 +9,7 @@ add_action('init', static function (): void {
     wp_register_script(
         'wordvel-editor-blocks',
         plugins_url('../assets/editor-blocks.js', __FILE__),
-        ['wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-data', 'wp-plugins'],
+        ['wp-api-fetch', 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-data', 'wp-plugins'],
         (string) filemtime(dirname(__DIR__) . '/assets/editor-blocks.js'),
         true,
     );
@@ -48,8 +48,7 @@ add_action('enqueue_block_editor_assets', static function (): void {
         'wordvel-editor-blocks',
         'window.wordvelBlocks = ' . wp_json_encode(wordvel_block_schemas()) . ';' . "\n" .
         'window.wordvelEditorPreviews = ' . wp_json_encode(wordvel_editor_preview_templates()) . ';' . "\n" .
-        'window.wordvelResourceApiUrl = ' . wp_json_encode(wordvel_resource_api_url()) . ';' . "\n" .
-        'window.wordvelRestNonce = ' . wp_json_encode(wp_create_nonce('wp_rest')) . ';' . "\n" .
+        'window.wordvelResourceApiPath = ' . wp_json_encode(wordvel_resource_api_path()) . ';' . "\n" .
         'window.wordvelResourceSchemas = ' . wp_json_encode(wordvel_resource_schemas()) . ';',
         'before',
     );

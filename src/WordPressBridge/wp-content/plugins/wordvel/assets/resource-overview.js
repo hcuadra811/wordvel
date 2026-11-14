@@ -2,7 +2,7 @@
     var config = window.wordvelResourceGroup;
     var root = document.getElementById('wordvel-resource-overview-root');
 
-    if (!config || !root || !config.apiBaseUrl || !Array.isArray(config.resources)) {
+    if (!config || !root || !config.apiPath || !Array.isArray(config.resources) || !window.wp || !window.wp.apiFetch) {
         return;
     }
 
@@ -13,9 +13,17 @@
     };
 
     function request(path) {
-        return window.fetch(config.apiBaseUrl + path, {
-            headers: { Accept: 'application/json', 'X-WP-Nonce': config.nonce },
-            credentials: 'same-origin'
+        return window.wp.apiFetch({
+            path: config.apiPath + path,
+            headers: { Accept: 'application/json' },
+            parse: false
+        }).catch(function (error) {
+            // With parse: false, apiFetch rejects non-2xx responses with the Response itself.
+            if (error && typeof error.json === 'function') {
+                return error;
+            }
+
+            throw error;
         }).then(function (response) {
             return response.json().then(function (json) {
                 if (!response.ok || json.status === false) {

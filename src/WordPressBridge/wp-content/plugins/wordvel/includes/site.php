@@ -70,8 +70,10 @@ function wordvel_proxy_api_route(WP_REST_Request $request, array $route): WP_RES
 
 /**
  * Sends a WordPress REST request on to Laravel over HTTP and relays the response.
+ * With $jsonOnly, a response body that is not JSON is replaced by an error
+ * instead of being relayed.
  */
-function wordvel_forward_request(WP_REST_Request $request, string $targetUrl, array $headers): WP_REST_Response
+function wordvel_forward_request(WP_REST_Request $request, string $targetUrl, array $headers, bool $jsonOnly = false): WP_REST_Response
 {
     $args = [
         'method' => $request->get_method(),
@@ -102,10 +104,15 @@ function wordvel_forward_request(WP_REST_Request $request, string $targetUrl, ar
 
     $body = wp_remote_retrieve_body($response);
     $decoded = json_decode((string) $body, true);
+    $status = (int) wp_remote_retrieve_response_code($response);
+
+    if ($jsonOnly && ! is_array($decoded)) {
+        return wordvel_proxy_error('Laravel returned a response that is not JSON.', $status >= 400 ? $status : 502);
+    }
 
     return new WP_REST_Response(
         is_array($decoded) ? $decoded : $body,
-        (int) wp_remote_retrieve_response_code($response),
+        $status,
     );
 }
 
