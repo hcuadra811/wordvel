@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Requests\EditorPreviewRequest;
 
 Route::prefix('wordvel')->group(function (): void {
+    // The frontend preview sync sends X-Wordvel-Bridge-Key (WORDVEL_BRIDGE_KEY).
     Route::post('/editor-preview', [WordvelEditorPreviewController::class, 'store'])
+        ->middleware('wordvel.bridge')
         ->name('wordvel.editor-preview.store')
         ->requestDto(EditorPreviewRequest::class)
         ->wpCapability('manage_options');

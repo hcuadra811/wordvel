@@ -130,6 +130,27 @@ The resource API is forwarded server-side to `config('wordvel.bridge.api_base_ur
 
 Routes that require the bridge key are never exported as public WordPress REST routes in the manifest. Apps can require the key on their own server-to-server routes with the `wordvel.bridge` middleware alias. The caller has to send the key itself, which means setting `WORDVEL_BRIDGE_KEY` explicitly and sharing it with that caller.
 
+## Editor Preview Sync
+
+The frontend preview sync (`wordvel-react sync`) posts rendered block HTML and CSS to `POST /api/wordvel/editor-preview`, and WordPress renders that HTML inside the block editor. The route requires the bridge key, so only a caller holding it can change what the editor shows:
+
+```php
+Route::post('/editor-preview', [WordvelEditorPreviewController::class, 'store'])
+    ->middleware('wordvel.bridge');
+```
+
+Set `WORDVEL_BRIDGE_KEY` explicitly in the API's `.env` (for example `openssl rand -hex 32`), and send the same value from the frontend's `wordvel.config.mjs`:
+
+```js
+export default {
+  endpoint: 'http://example-api.test/api/wordvel/editor-preview',
+  headers: { 'X-Wordvel-Bridge-Key': process.env.WORDVEL_BRIDGE_KEY },
+  // ...
+};
+```
+
+Reading the stored preview (`GET /api/wordvel/editor-preview`, `GET /api/wordvel/editor.css`) stays open.
+
 ## Resource CoC
 
 A resource DTO is a Spatie Laravel Data class with `#[WordVelResource]`.
