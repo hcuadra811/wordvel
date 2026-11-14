@@ -62,17 +62,20 @@ function wordvel_proxy_api_route(WP_REST_Request $request, array $route): WP_RES
     $targetUrl = wordvel_proxy_target_url($request, $route);
 
     if ($targetUrl === '') {
-        return new WP_REST_Response([
-            'status' => false,
-            'error' => [
-                'message' => 'WordVel route target URL is missing.',
-            ],
-        ], 502);
+        return wordvel_proxy_error('WordVel route target URL is missing.', 502);
     }
 
+    return wordvel_forward_request($request, $targetUrl, wordvel_proxy_headers($request));
+}
+
+/**
+ * Sends a WordPress REST request on to Laravel over HTTP and relays the response.
+ */
+function wordvel_forward_request(WP_REST_Request $request, string $targetUrl, array $headers): WP_REST_Response
+{
     $args = [
         'method' => $request->get_method(),
-        'headers' => wordvel_proxy_headers($request),
+        'headers' => $headers,
         'timeout' => 30,
         'redirection' => 0,
     ];
@@ -87,19 +90,14 @@ function wordvel_proxy_api_route(WP_REST_Request $request, array $route): WP_RES
 
         if ($body !== '') {
             $args['body'] = $body;
-            $args['headers']['Content-Type'] ??= 'application/json';
+            $args['headers']['content-type'] ??= 'application/json';
         }
     }
 
     $response = wp_remote_request($targetUrl, $args);
 
     if (is_wp_error($response)) {
-        return new WP_REST_Response([
-            'status' => false,
-            'error' => [
-                'message' => $response->get_error_message(),
-            ],
-        ], 502);
+        return wordvel_proxy_error($response->get_error_message(), 502);
     }
 
     $body = wp_remote_retrieve_body($response);
@@ -109,6 +107,16 @@ function wordvel_proxy_api_route(WP_REST_Request $request, array $route): WP_RES
         is_array($decoded) ? $decoded : $body,
         (int) wp_remote_retrieve_response_code($response),
     );
+}
+
+function wordvel_proxy_error(string $message, int $status): WP_REST_Response
+{
+    return new WP_REST_Response([
+        'status' => false,
+        'error' => [
+            'message' => $message,
+        ],
+    ], $status);
 }
 
 function wordvel_proxy_target_url(WP_REST_Request $request, array $route): string

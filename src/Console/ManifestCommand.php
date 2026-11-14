@@ -38,7 +38,7 @@ final class ManifestCommand extends Command
                 'styles' => config('wordvel.editor.styles', []),
                 'preview_url' => url('/api/wordvel/editor-preview'),
                 'css_url' => url('/api/wordvel/editor.css'),
-                'resource_api_url' => url('/api/wordvel/resources'),
+                'resource_api_url' => $this->apiBaseUrl() . '/api/wordvel/resources',
             ],
             'routes' => [],
             'regions' => [],
@@ -171,9 +171,12 @@ final class ManifestCommand extends Command
 
     private function targetUrl(Route $route): string
     {
-        $base = rtrim((string) config('wordvel.bridge.api_base_url', config('app.url')), '/');
+        return $this->apiBaseUrl() . '/' . ltrim($route->uri(), '/');
+    }
 
-        return $base . '/' . ltrim($route->uri(), '/');
+    private function apiBaseUrl(): string
+    {
+        return rtrim((string) config('wordvel.bridge.api_base_url', config('app.url')), '/');
     }
 
     /**

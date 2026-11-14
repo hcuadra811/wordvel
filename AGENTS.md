@@ -34,6 +34,8 @@ WordPress REST request -> wp_remote_request(target_url) -> Laravel API route
 
 Do not reintroduce `WordvelApplication::dispatch()` into WordPress route callbacks for API routes. That bypasses Laravel HTTP behavior.
 
+Resource editor scripts call the WordPress proxy at `/wp-json/wordvel-editor/v1/resources/...` with the login cookie and `X-WP-Nonce`. Never point browser code at `/api/wordvel/resources` directly: those routes require the `X-Wordvel-Bridge-Key` header that only the WordPress proxy sends (`Wordvel\Bridge\BridgeKey`, `VerifyBridgeKey` middleware).
+
 ## Installers
 
 `wordvel:install` should:

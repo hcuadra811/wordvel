@@ -210,8 +210,7 @@ add_action('admin_enqueue_scripts', static function (string $hook): void {
     $page = isset($_GET['page']) ? sanitize_key((string) $_GET['page']) : '';
     $resourceKey = str_replace('wordvel-resource-', '', $page);
     $schema = wordvel_resource_schema($resourceKey);
-    $manifest = wordvel_manifest();
-    $apiBaseUrl = is_array($manifest) ? (string) ($manifest['editor']['resource_api_url'] ?? '') : '';
+    $apiBaseUrl = wordvel_resource_api_url();
 
     if (! str_starts_with($page, 'wordvel-resource-group-') && ($schema === null || $apiBaseUrl === '')) {
         return;
@@ -248,7 +247,8 @@ add_action('admin_enqueue_scripts', static function (string $hook): void {
                 'wordvel-resource-overview',
                 'window.wordvelResourceGroup = ' . wp_json_encode([
                     'resources' => $resources,
-                    'apiBaseUrl' => untrailingslashit($apiBaseUrl),
+                    'apiBaseUrl' => $apiBaseUrl,
+                    'nonce' => wp_create_nonce('wp_rest'),
                     'adminUrl' => admin_url('admin.php'),
                 ]) . ';',
                 'before',
@@ -275,7 +275,8 @@ add_action('admin_enqueue_scripts', static function (string $hook): void {
             'resourceKey' => $resourceKey,
             'schema' => $schema,
             'resources' => wordvel_resource_schemas(),
-            'apiBaseUrl' => untrailingslashit($apiBaseUrl),
+            'apiBaseUrl' => $apiBaseUrl,
+            'nonce' => wp_create_nonce('wp_rest'),
             'adminUrl' => admin_url('admin.php'),
             'adminPage' => 'wordvel-resource-' . $resourceKey,
             'initialId' => isset($_GET['record']) ? sanitize_text_field((string) $_GET['record']) : null,

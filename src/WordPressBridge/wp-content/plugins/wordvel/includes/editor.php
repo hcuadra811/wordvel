@@ -48,7 +48,8 @@ add_action('enqueue_block_editor_assets', static function (): void {
         'wordvel-editor-blocks',
         'window.wordvelBlocks = ' . wp_json_encode(wordvel_block_schemas()) . ';' . "\n" .
         'window.wordvelEditorPreviews = ' . wp_json_encode(wordvel_editor_preview_templates()) . ';' . "\n" .
-        'window.wordvelResourceApiUrl = ' . wp_json_encode(untrailingslashit((string) (wordvel_manifest()['editor']['resource_api_url'] ?? ''))) . ';' . "\n" .
+        'window.wordvelResourceApiUrl = ' . wp_json_encode(wordvel_resource_api_url()) . ';' . "\n" .
+        'window.wordvelRestNonce = ' . wp_json_encode(wp_create_nonce('wp_rest')) . ';' . "\n" .
         'window.wordvelResourceSchemas = ' . wp_json_encode(wordvel_resource_schemas()) . ';',
         'before',
     );

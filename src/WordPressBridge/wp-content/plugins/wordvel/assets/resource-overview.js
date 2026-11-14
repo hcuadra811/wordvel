@@ -14,8 +14,8 @@
 
     function request(path) {
         return window.fetch(config.apiBaseUrl + path, {
-            headers: { Accept: 'application/json' },
-            credentials: 'omit'
+            headers: { Accept: 'application/json', 'X-WP-Nonce': config.nonce },
+            credentials: 'same-origin'
         }).then(function (response) {
             return response.json().then(function (json) {
                 if (!response.ok || json.status === false) {

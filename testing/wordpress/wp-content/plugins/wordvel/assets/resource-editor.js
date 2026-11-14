@@ -202,9 +202,10 @@
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
-                'X-Wordvel-Language': state.language
+                'X-Wordvel-Language': state.language,
+                'X-WP-Nonce': config.nonce
             },
-            credentials: 'omit'
+            credentials: 'same-origin'
         }, options || {})).then(function (response) {
             return response.json().then(function (json) {
                 if (!response.ok || json.status === false) {

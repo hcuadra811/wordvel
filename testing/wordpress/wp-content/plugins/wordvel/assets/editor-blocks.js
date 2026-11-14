@@ -1414,7 +1414,8 @@
 
             setLoading(true);
             window.fetch(url + (query.toString() ? '?' + query.toString() : ''), {
-                headers: { Accept: 'application/json' }
+                headers: { Accept: 'application/json', 'X-WP-Nonce': window.wordvelRestNonce },
+                credentials: 'same-origin'
             }).then(function (response) {
                 if (!response.ok) {
                     throw new Error('Could not load ' + resource);
@@ -1463,7 +1464,8 @@
             });
 
             window.fetch(url + '?' + query.toString(), {
-                headers: { Accept: 'application/json' }
+                headers: { Accept: 'application/json', 'X-WP-Nonce': window.wordvelRestNonce },
+                credentials: 'same-origin'
             }).then(function (response) {
                 if (!response.ok) {
                     throw new Error('Could not load selected ' + resource);
@@ -1542,8 +1544,10 @@
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': window.wordvelRestNonce
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify({ values: modal.values || {} })
             }).then(function (response) {
                 if (!response.ok) {

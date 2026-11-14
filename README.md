@@ -17,7 +17,7 @@ The philosophy is codebase-as-configuration:
 - DTO-driven Gutenberg block schemas using `#[AsBlock]` and block field attributes.
 - DTO-driven theme option schemas using `#[AsThemeOptions]` and `#[OptionGroup]`.
 - DTO-driven resource editor schemas using `#[WordVelResource]`.
-- Resource CRUD endpoints under `/api/wordvel/resources`.
+- Resource CRUD endpoints under `/api/wordvel/resources`, reachable only through the WordPress bridge.
 - Editor preview sync endpoints under `/api/wordvel/editor-preview`.
 - Optional API Kit and OpenAPI generator integration.
 
@@ -82,6 +82,7 @@ Bridge config:
 
 ```php
 'bridge' => [
+    'key' => env('WORDVEL_BRIDGE_KEY'),
     'expose_api_routes' => true,
     'api_base_url' => env('WORDVEL_API_URL', env('APP_URL')),
     'include_prefixes' => ['api'],
@@ -104,6 +105,28 @@ Route::get('/custom-public-feed', Controller::class)
 ```
 
 `responseDto()` is kept as a backward-compatible route macro, but generated WordVel code no longer uses it. OpenAPI generation does not need it, and the WordPress bridge does not need it.
+
+## Resource Editor API
+
+The resource CRUD routes under `/api/wordvel/resources` only accept requests from the WordPress bridge. Browsers never call them directly:
+
+```txt
+Editor script -> /wp-json/wordvel-editor/v1/resources/... (WordPress login cookie + X-WP-Nonce)
+WordPress     -> /api/wordvel/resources/...               (X-Wordvel-Bridge-Key)
+```
+
+WordPress checks the user before forwarding:
+
+- `GET {resource}/options`, which block editor relationship pickers use, needs `edit_posts`;
+- every other resource request needs `manage_options`, the same capability as the resource admin screens.
+
+WordPress then forwards the request to the manifest's `editor.resource_api_url` with an `X-Wordvel-Bridge-Key` header. Laravel's `Wordvel\Http\Middleware\VerifyBridgeKey` runs on every resource route, after `config('wordvel.resources.middleware')`, and answers `401` unless the header matches.
+
+The key is `WORDVEL_BRIDGE_KEY` when set, and otherwise an HMAC derived from `APP_KEY`. WordPress boots the same Laravel application, so both sides resolve the same key with no extra setup. Set `WORDVEL_BRIDGE_KEY` only to rotate the key separately from `APP_KEY`. With neither set, every request is refused.
+
+Apps can put the same check on their own WordPress-only routes with the `wordvel.bridge` middleware alias.
+
+The resource API is forwarded to `config('wordvel.bridge.api_base_url')`, like other bridge routes.
 
 ## Resource CoC
 

@@ -12,6 +12,10 @@ return [
         ])),
     ],
     'bridge' => [
+        // Shared secret WordPress sends to Laravel on resource editor requests.
+        // When empty, it is derived from APP_KEY, which WordPress already shares
+        // because it boots this Laravel application.
+        'key' => env('WORDVEL_BRIDGE_KEY'),
         'expose_api_routes' => env('WORDVEL_BRIDGE_EXPOSE_API_ROUTES', true),
         'api_base_url' => env('WORDVEL_API_URL', env('APP_URL')),
         'include_prefixes' => ['api'],

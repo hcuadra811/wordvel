@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Route;
 use Wordvel\Http\Controllers\ResourceController;
+use Wordvel\Http\Middleware\VerifyBridgeKey;
 
 Route::prefix('api/wordvel')
-    ->middleware(config('wordvel.resources.middleware', ['api']))
+    ->middleware([...Arr::wrap(config('wordvel.resources.middleware', ['api'])), VerifyBridgeKey::class])
     ->group(function (): void {
         Route::get('/resources', [ResourceController::class, 'schemas'])->name('wordvel.resources.schemas');
         Route::get('/resources/{resource}/options', [ResourceController::class, 'options'])->name('wordvel.resources.options');
