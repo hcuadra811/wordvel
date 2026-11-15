@@ -26,6 +26,7 @@ try {
                 isset($payload['title']) ? (string) $payload['title'] : null,
                 isset($payload['alt']) ? (string) $payload['alt'] : null,
             ),
+            'deleteMedia' => wordvel_codex_delete_media((int) ($payload['id'] ?? 0)),
             'option' => wordvel_codex_option((string) ($payload['key'] ?? ''), $payload['default'] ?? null),
             'menuByLocation' => wordvel_codex_menu_by_location(
                 (string) ($payload['location'] ?? ''),
@@ -144,6 +145,27 @@ function wordvel_codex_import_media(string $path, ?string $title = null, ?string
     }
 
     return wordvel_codex_media((int) $attachmentId);
+}
+
+/**
+ * Permanently deletes a media library attachment and its files. Only posts of
+ * type attachment are deleted, so an id that belongs to a page or post is
+ * refused rather than trashed.
+ */
+function wordvel_codex_delete_media(int $id): bool
+{
+    if ($id <= 0) {
+        return false;
+    }
+
+    $attachment = get_post($id);
+
+    if ($attachment === null || $attachment->post_type !== 'attachment') {
+        return false;
+    }
+
+    // wp_delete_attachment returns the deleted post, or false/null on failure.
+    return is_object(wp_delete_attachment($id, true));
 }
 
 function wordvel_codex_option(string $key, mixed $default = null): mixed

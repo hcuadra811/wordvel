@@ -28,6 +28,20 @@ final class MediaRepository
         return $this->mediaFromPayload($media);
     }
 
+    /**
+     * Permanently deletes the attachment and its files from the media library.
+     * Returns false when the id is not a media library attachment or WordPress
+     * could not delete it.
+     *
+     * importFile() returns the existing attachment when a file with the same
+     * content was imported before, so several records can share one
+     * attachment. Check that nothing else references it before deleting.
+     */
+    public function delete(int $id): bool
+    {
+        return $this->wordpress->call('deleteMedia', ['id' => $id]) === true;
+    }
+
     private function mediaFromPayload(mixed $media): ?WordPressMedia
     {
         if (! is_array($media)) {
